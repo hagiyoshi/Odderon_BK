@@ -83,13 +83,13 @@ __global__ void Integration_BK_direct(cuDoubleComplex* integrated, cuDoubleCompl
 					simpson1*simpson2
 					*(x_1[j*N+i]* x_1[j*N + i]+ y_1[j*N + i] * y_1[j*N + i])
 					/((x_1[m*N + n] - x_1[j*N + i])*(x_1[m*N + n] - x_1[j*N + i])+ (y_1[m*N + n] - y_1[j*N + i])*(y_1[m*N + n] - y_1[j*N + i]))
-					/ (x_1[m*N + n] * x_1[m*N + n]+ y_1[m*N + n] * y_1[m*N]),
+					/ (x_1[m*N + n] * x_1[m*N + n]+ y_1[m*N + n] * y_1[m*N+n]),
 					0.0
 				);
 
 				if(((x_1[m*N + n] - x_1[j*N + i])*(x_1[m*N + n] - x_1[j*N + i]) 
 						+ (y_1[m*N + n] - y_1[j*N + i])*(y_1[m*N + n] - y_1[j*N + i])) < 1.0e-12
-					|| (x_1[m*N + n] * x_1[m*N + n] + y_1[m*N + n] * y_1[m*N]) < 1.0e-12){
+					|| (x_1[m*N + n] * x_1[m*N + n] + y_1[m*N + n] * y_1[m*N+n]) < 1.0e-12){
 					coeff = make_cuDoubleComplex(0.0,0.0);
 				}
 
