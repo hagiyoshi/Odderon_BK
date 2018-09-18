@@ -71,10 +71,10 @@ __global__ void Integration_BK_direct(cuDoubleComplex* integrated, cuDoubleCompl
 					//trV=S(r-z)
 					trV_V = cuCadd(trV_V,
 						S_matrix[(j - m + N / 2) * N + i - n + N / 2]);
-					//trV=S(r-z)*S(z)
+					//trV=S(r-z)*S(-z) <- S(-x) = S(x)^*
 					trV_V = cuCmul(trV_V,
-						S_matrix[m * N + n]);
-					//trV=S(r-z)*S(z) - S(r)
+						cuConj(S_matrix[m * N + n]));
+					//trV=S(r-z)*S(-z) - S(r)
 					trV_V = cuCsub(trV_V,
 						S_matrix[j * N + i]);
 				}
@@ -84,10 +84,7 @@ __global__ void Integration_BK_direct(cuDoubleComplex* integrated, cuDoubleCompl
 					*(x_1[j*N+i]* x_1[j*N + i]+ y_1[j*N + i] * y_1[j*N + i])
 					/((x_1[m*N + n] - x_1[j*N + i])*(x_1[m*N + n] - x_1[j*N + i])+ (y_1[m*N + n] - y_1[j*N + i])*(y_1[m*N + n] - y_1[j*N + i]))
 					/ (x_1[m*N + n] * x_1[m*N + n]+ y_1[m*N + n] * y_1[m*N]),
-					simpson1*simpson2
-					*(x_1[j*N + i] * x_1[j*N + i] + y_1[j*N + i] * y_1[j*N + i])
-					/ ((x_1[m*N + n] - x_1[j*N + i])*(x_1[m*N + n] - x_1[j*N + i]) + (y_1[m*N + n] - y_1[j*N + i])*(y_1[m*N + n] - y_1[j*N + i]))
-					/ (x_1[m*N + n] * x_1[m*N + n] + y_1[m*N + n] * y_1[m*N])
+					0.0
 				);
 
 				if(((x_1[m*N + n] - x_1[j*N + i])*(x_1[m*N + n] - x_1[j*N + i]) 

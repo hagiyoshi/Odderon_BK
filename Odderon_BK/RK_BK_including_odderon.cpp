@@ -95,7 +95,7 @@ void init_BK(std::complex<double>* Smatrix_in){
 			Smatrix_in[NX*j + i] = complex<double>(
 				exp(-(x[NX*j + i]* x[NX*j + i]+ y[NX*j + i]* y[NX*j + i])*initialQ0*initialQ0),
 				exp(-(x[NX*j + i] * x[NX*j + i] + y[NX*j + i] * y[NX*j + i])*initialQ0*initialQ0)
-				*(x[NX*j + i] * x[NX*j + i] + y[NX*j + i] * y[NX*j + i])*sqrt(y[NX*j + i]* y[NX*j + i])
+				*(x[NX*j + i] * x[NX*j + i] + y[NX*j + i] * y[NX*j + i])*y[NX*j + i]
 				*initial_C
 				);
 		}
@@ -181,13 +181,15 @@ void print_g(vector<complex<double>> &sol_BK) {
 	}
 
 	ostringstream ofilename,ofilename2;
-	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\solutions\\BK_res_size" << LATTICE_SIZE << "_grid_" << NX << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
+	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\solutions\\BK_res_size" 
+		<< LATTICE_SIZE << "_grid_" << NX << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
 	ofstream ofs_res(ofilename.str().c_str());
-	ofilename2 << "G:\\hagiyoshi\\Data\\BK_odderon\\solutions\\BK_res_distance_size" << LATTICE_SIZE << "_grid_" << NX << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
+	ofilename2 << "G:\\hagiyoshi\\Data\\BK_odderon\\solutions\\BK_res_distance_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
 	ofstream ofs_res2(ofilename2.str().c_str());
 
 	ofs_res << "# x \t y \t Re( S ) \t Im( S )"<< endl;
-	ofs_res << "# r \t Re( S ) \t Im( S )" << endl;
+	ofs_res2 << "# r \t Re( S ) \t Im( S )" << endl;
 
 	for (int i = 0; i <NX; i++){
 		for (int j = 0; j < NX; j++) {
