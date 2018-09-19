@@ -105,6 +105,31 @@ void init_BK(std::complex<double>* Smatrix_in){
 }
 
 
+void init_BK_log(std::complex<double>* Smatrix_in) {
+	//tau = 0;
+	int N = NX;
+	double h = 1.0*LATTICE_SIZE / NX;
+	double h_theta = 2.0*Pi / NPHI;
+	double   xmax = h * NX / 1.0, xmin = -h * NX / 2.0, ymin = 0.0;
+	double   *x = new double[N*N], *y = new double[N*N];
+	for (int j = 0; j < NX; j++) {
+		for (int i = 0; i < NX; i++)
+		{
+			x[NX*j + i] = xmin + i * h;
+			y[NX*j + i] = ymin + j * h_theta;
+			Smatrix_in[NX*j + i] = complex<double>(
+				exp(-exp(2.0*x[NX*j + i])*initialQ0*initialQ0),
+				exp(-exp(2.0*x[NX*j + i] )*initialQ0*initialQ0)
+				*exp(3.0*x[NX*j + i] )*sin(y[NX*j + i])
+				* initial_C
+				);
+		}
+	}
+
+
+}
+
+
 void Integration_in_BK_equation(std::complex<double>* Smatrix_in, std::complex<double>* Integrated_out);
 
 void f_one_step_BK_complex(

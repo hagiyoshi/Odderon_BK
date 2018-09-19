@@ -66,6 +66,9 @@ __global__ void Integration_BK_direct(cuDoubleComplex* integrated, cuDoubleCompl
 				cuDoubleComplex trV_V = make_cuDoubleComplex(0.0, 0.0);
 				//if r-z is out of the region then we take the S(r-z) =0.
 				if((j - m + N / 2)<0|| (j - m + N / 2)>N-1|| (i - n + N / 2)<0|| (i - n + N / 2)>N-1){
+					//trV= - S(r)
+					trV_V = cuCsub(trV_V,
+						S_matrix[j * N + i]);
 				}
 				else {
 					//trV=S(r-z)
