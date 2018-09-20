@@ -33,26 +33,40 @@ __device__ cuDoubleComplex linear_interpolation_Smatrix(cuDoubleComplex* S_matri
 {
 	double h = 1.0*LATTICE_SIZE / NX;
 	double h_theta = 2.0*Pi / NPHI;
-	double   xmax = h * NX / 1.0, xmin = -h * NX / 2.0, ymin = 0.0;
+	double   xmax = h * NX / 4.0, xmin = -h * NX *3.0/ 4.0, ymin = 0.0;
 	int i_x=0;
 	int i_p = 0;
 
 	for (int i=0;i<NX-1;i++)
 	{
-		if (x < x_1[i]) { i_x = i; }
+		//double dx = x_1[i];
+		double dx = double(i)*h + xmin;
+		double diffdx = dx - x;
+		//printf("i %d \n", i);
+		if (0.0 > diffdx){ i_x = i;
+		//printf(" if in dx - x %.3e ,i_x %d \n", diffdx , i_x);
+		}
+		else { 
+			//printf("finish dx - x %.3e ,i_x %d \n", diffdx, i_x); 
+		continue; }
 	}
 
 	for (int i = 0; i < NPHI-1; i++)
 	{
-		if (p < p_1[NX*i] ) { i_p = i; }
+		//double dp = p_1[NX*i];
+		double dp = double(i)*h_theta;
+		double diffdp = dp - p;
+		if (0.0 > diffdp) { i_p = i; }
+		else { continue; }
 	}
 
-	if (x > xmax || p > 2.0*Pi || x < xmin || p < ymin)
+	if (x > x_1[NX-1] || p > 2.0*Pi || x < x_1[0] || p < ymin)
 	{
 		printf( "out of range \n");
 		assert(1);
 	}
 
+	//printf("i_x %d , i_p %d ,x_1[i_x] %.3e , p_1[i_p] %.3e , x %.3e , p %.3e \n" , i_x, i_p, x_1[i_x], p_1[NX*i_p], x, p);
 	//bilinear interpolation
 	double t = (x - x_1[i_x]) / (x_1[i_x + 1] - x_1[i_x]);
 	double u = (p - p_1[NX*i_p]) / (p_1[NX*(i_p + 1)] - p_1[NX*i_p]);
@@ -70,13 +84,66 @@ __device__ cuDoubleComplex linear_interpolation_Smatrix(cuDoubleComplex* S_matri
 }
 
 
+__device__ double test_for_if(double* x_1, double* p_1, double x, double p)
+{
+	double h = 1.0*LATTICE_SIZE / NX;
+	double h_theta = 2.0*Pi / NPHI;
+	double   xmax = h * NX / 4.0, xmin = -h * NX *3.0 / 4.0, ymin = 0.0;
+	int i_x = 0;
+	int i_p = 0;
+
+	for (int i = 0; i < NX - 1; i++)
+	{
+		//double dx = x_1[i];
+		double dx = double(i)*h + xmin;
+		double diffdx = dx - x;
+		printf("i %d \n", i);
+		if (0.0 > diffdx) {
+			i_x = i;
+			printf(" if in dx - x %.3e ,i_x %d \n", diffdx, i_x);
+		}
+		else { printf("finish dx - x %.3e ,i_x %d \n", diffdx, i_x); continue; }
+	}
+
+	for (int i = 0; i < NPHI - 1; i++)
+	{
+		//double dp = p_1[NX*i];
+		double dp = double(i)*h_theta;
+		double diffdp = dp - p;
+		if (0.0 > diffdp) { i_p = i; }
+		else { continue; }
+	}
+
+	return x - x_1[i_x];
+}
+
+__global__ void test_dayo(double* x_1, double* p_1)
+{
+
+	int i = threadIdx.x + blockIdx.x*blockDim.x;
+	int j = threadIdx.y + blockIdx.y*blockDim.y;
+	int index = j * NX + i;
+	if (i < NX && j < NPHI) {
+		double h = 1.0*LATTICE_SIZE / NX;
+		double h_theta = 2.0*Pi / NPHI;
+		double result = 0;
+		//for (int i = 0; i < NX; i++) {
+		int i = -2;
+			result = test_for_if(x_1, p_1, i*h, i*h_theta);
+		//}
+	
+	
+	}
+
+}
+
 //input S_matrix NX*NPHI, x_1 NX, p_1 PHI;
 __device__ cuDoubleComplex linear_interpolation_Smatrix_test(cuDoubleComplex* S_matrix,
 	double* x_1, double* p_1, double x, double p)
 {
 	double h = 1.0*LATTICE_SIZE / NX;
 	double h_theta = 2.0*Pi / NPHI;
-	double   xmax = h * NX / 1.0, xmin = -h * NX / 2.0, ymin = 0.0;
+	double   xmax = h * NX / 4.0, xmin = -h * NX* 3.0/ 4.0, ymin = 0.0;
 	int i_x = 0;
 	int i_p = 0;
 
@@ -208,7 +275,7 @@ __global__ void Integration_BK_logscale_direct(cuDoubleComplex* integrated, cuDo
 		integrated[index] = make_cuDoubleComplex(0.0, 0.0);
 		//sit the index which is center of the gaussian.
 
-		double   xmax = h * NX / 1.0, xmin = -h * NX / 2.0, ymin = 0.0;
+		double   xmax = h * NX / 4.0, xmin = -h * NX* 3.0 / 4.0, ymin = 0.0;
 		double h_theta = 2.0*Pi / NPHI;
 		cuDoubleComplex complex_zero = make_cuDoubleComplex(0.0, 0.0);
 		//If x=N*j+i, then -x=N*(N-j)+N-i(when the origin is x= N*N/2 + N/2).
@@ -237,9 +304,11 @@ __global__ void Integration_BK_logscale_direct(cuDoubleComplex* integrated, cuDo
 					- 2.0*exp(x_1[j * N + i] + x_1[m * N + n])*cos(y_1[j * N + i] - y_1[m * N + n]);
 				double angletocos = (exp(x_1[j * N + i])*cos(y_1[j * N + i]) - exp(x_1[m * N + n]) * cos(y_1[m * N + n])) / sqrt(r_z2);
 				if (angletocos >= 1.0) {
+					//printf("cos is larger than 1 cos if %.6e\n" , angletocos-1.0);
 					angletocos = 1.0;
 				}
 				else if (angletocos <= -1.0) {
+					//printf("cos is smaller than -1 cos if %.6e\n", angletocos+1.0);
 					angletocos = -1.0;
 				}
 				//if r-z is out of the region then we take the S(r-z) =0.
@@ -267,8 +336,8 @@ __global__ void Integration_BK_logscale_direct(cuDoubleComplex* integrated, cuDo
 						S_matrix[j * N + i]);
 				}
 				//Caution!!! nan * 0 = nan
-				if ((x_1[j * N + i] - x_1[m * N + n])*(x_1[j * N + i] - x_1[m * N + n]) < 1.0e-10 &&
-					(y_1[j * N + i] - y_1[m * N + n])*(y_1[j * N + i] - y_1[m * N + n]) < 1.0e-10 || r_z2<0.0) {
+				if (( (x_1[j * N + i] - x_1[m * N + n])*(x_1[j * N + i] - x_1[m * N + n]) < 1.0e-10 &&
+					(y_1[j * N + i] - y_1[m * N + n])*(y_1[j * N + i] - y_1[m * N + n]) < 1.0e-10 ) || r_z2<0.0) {
 					trV_V = make_cuDoubleComplex(
 						0.0
 						,
@@ -278,7 +347,7 @@ __global__ void Integration_BK_logscale_direct(cuDoubleComplex* integrated, cuDo
 
 				cuDoubleComplex coeff = make_cuDoubleComplex(
 					simpson1*simpson2
-					*exp(2.0*x_1[j*N + i] - x_1[m * N + n])
+					*exp(2.0*x_1[j*N + i])
 					/ r_z2,
 					0.0
 				);
@@ -314,7 +383,7 @@ __global__ void Integration_BK_logscale_direct_test(cuDoubleComplex* integrated,
 		integrated[index] = make_cuDoubleComplex(0.0, 0.0);
 		//sit the index which is center of the gaussian.
 
-		double   xmax = h * NX / 1.0, xmin = -h * NX / 2.0, ymin = 0.0;
+		double   xmax = h * NX / 4.0, xmin = -h * NX* 3.0 / 4.0, ymin = 0.0;
 		double h_theta = 2.0*Pi / NPHI;
 		cuDoubleComplex complex_zero = make_cuDoubleComplex(0.0, 0.0);
 		//If x=N*j+i, then -x=N*(N-j)+N-i(when the origin is x= N*N/2 + N/2).
@@ -397,7 +466,7 @@ void Integration_in_BK_equation(std::complex<double>* Smatrix_in, std::complex<d
 
 	int N = NX;
 	double h = 1.0*LATTICE_SIZE / NX;
-	double   xmax = h * NX / 1.0, xmin = -h * NX / 2.0, ymin = -h * NX / 2.0;
+	double   xmax = h * NX / 2.0, xmin = -h * NX / 2.0, ymin = -h * NX / 2.0;
 	double   *x = new double[N*N], *y = new double[N*N];
 	for (int j = 0; j < NX; j++) {
 		for (int i = 0; i < NX; i++)
@@ -445,7 +514,7 @@ void Integration_in_logscale_BK_equation(std::complex<double>* Smatrix_in, std::
 	int N = NX;
 	double h = 1.0*LATTICE_SIZE / NX;
 	double h_theta = 2.0*Pi / NPHI;
-	double   xmax = h * NX / 1.0, xmin = -h * NX / 2.0, ymin = 0.0;
+	double   xmax = h * NX / 4.0, xmin = -h * NX* 3.0 / 4.0, ymin = 0.0;
 	double   *x = new double[N*NPHI], *y = new double[N*NPHI];
 	for (int j = 0; j < NPHI; j++) {
 		for (int i = 0; i < NX; i++)
@@ -474,6 +543,7 @@ void Integration_in_logscale_BK_equation(std::complex<double>* Smatrix_in, std::
 
 	//Integration_BK_logscale_direct_test <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, N);
 	Integration_BK_logscale_direct <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, N);
+	//test_dayo <<<dimGrid, dimBlock >>> ( x_d, y_d);
 
 	cudaError_t err = cudaGetLastError();
 	if (err != cudaSuccess) {

@@ -67,8 +67,8 @@ const double IMPACTP_B = 1.0;
 * The evolution step size.
 */
 #define DELTA_T         0.01
-#define OUTPUT_DELTA_T  0.01
-#define END_T           0.1
+#define OUTPUT_DELTA_T  0.1
+#define END_T           5.0
 
 
 /**
@@ -110,7 +110,7 @@ void init_BK_log(std::complex<double>* Smatrix_in) {
 	int N = NX;
 	double h = 1.0*LATTICE_SIZE / NX;
 	double h_theta = 2.0*Pi / NPHI;
-	double   xmax = h * NX / 1.0, xmin = -h * NX / 2.0, ymin = 0.0;
+	double   xmax = h * NX / 4.0, xmin = -h * NX *3.0/ 4.0, ymin = 0.0;
 	double   *x = new double[N*N], *y = new double[N*N];
 	for (int j = 0; j < NPHI; j++) {
 		for (int i = 0; i < NX; i++)
@@ -299,7 +299,7 @@ void print_logscale_g(vector<complex<double>> &sol_BK) {
 	int N = NX;
 	double h = 1.0*LATTICE_SIZE / NX;
 	double h_theta = 2.0*Pi / NPHI;
-	double   xmax = h * NX / 1.0, xmin = -h * NX / 2.0, ymin = 0.0;
+	double   xmax = h * NX / 4.0, xmin = -h * NX*3.0 / 4.0, ymin = 0.0;
 	double   *x = new double[N*NPHI], *y = new double[N*NPHI];
 	for (int j = 0; j < NPHI; j++) {
 		for (int i = 0; i < NX; i++)
