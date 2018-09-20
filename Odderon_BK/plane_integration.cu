@@ -510,7 +510,6 @@ void Integration_in_BK_equation(std::complex<double>* Smatrix_in, std::complex<d
 void Integration_in_logscale_BK_equation(std::complex<double>* Smatrix_in, std::complex<double>* Integrated_out)
 {
 
-
 	int N = NX;
 	double h = 1.0*LATTICE_SIZE / NX;
 	double h_theta = 2.0*Pi / NPHI;
