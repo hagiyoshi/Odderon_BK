@@ -339,7 +339,7 @@ void Integration_BK_logscale_direct_cpp(std::complex<double>* integrated, std::c
 					}
 					else if (r_z > xmax - h) {
 
-						std::complex<double> zero = std::complex<double>(1.0, 0.0);
+						std::complex<double> zero = std::complex<double>(0.0, 0.0);
 						//trV=S(r-z)
 						trV_V += zero;
 						//trV=S(r-z)*S(-z) <- S(-x) = S(x)^*
