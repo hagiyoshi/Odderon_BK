@@ -313,6 +313,8 @@ void Integration_BK_logscale_direct_cpp(std::complex<double>* integrated, std::c
 						- 2.0*exp(x_1[j * N + i] + x_1[m * N + n])*cos(y_1[j * N + i] - y_1[m * N + n]));
 					double r_z2 = exp(2.0*x_1[j * N + i]) + exp(2.0*x_1[m * N + n])
 						- 2.0*exp(x_1[j * N + i] + x_1[m * N + n])*cos(y_1[j * N + i] - y_1[m * N + n]);
+					double r_z2_o_x2 = 1.0 + exp(2.0*x_1[m * N + n] - 2.0*x_1[j * N + i])
+						- 2.0*exp(-x_1[j * N + i] + x_1[m * N + n])*cos(y_1[j * N + i] - y_1[m * N + n]);
 					double angletocos = (exp(x_1[j * N + i])*cos(y_1[j * N + i]) - exp(x_1[m * N + n]) * cos(y_1[m * N + n])) / sqrt(r_z2);
 					if (angletocos >= 1.0) {
 						//printf("cos is larger than 1 cos if %.6e\n" , angletocos-1.0);
@@ -324,8 +326,26 @@ void Integration_BK_logscale_direct_cpp(std::complex<double>* integrated, std::c
 					}
 
 					//if r-z is out of the region then we take the S(r-z) =0.
-					if ((j - m + N / 2) < 0 || (j - m + N / 2) > N - 1 || (i - n + N / 2) < 0 || (i - n + N / 2) > N - 1) {
-						//trV= - S(r)
+					if (r_z < xmin) {
+						std::complex<double> unit = std::complex<double>(1.0, 0.0);
+						//trV=S(r-z)
+						trV_V += unit;
+						//trV=S(r-z)*S(-z) <- S(-x) = S(x)^*
+						trV_V = trV_V
+							* std::conj(S_matrix[m * N + n]);
+						//trV=S(r-z)*S(-z) - S(r)
+						trV_V = trV_V
+							- S_matrix[j * N + i];
+					}
+					else if (r_z > xmax - h) {
+
+						std::complex<double> zero = std::complex<double>(1.0, 0.0);
+						//trV=S(r-z)
+						trV_V += zero;
+						//trV=S(r-z)*S(-z) <- S(-x) = S(x)^*
+						trV_V = trV_V
+							* std::conj(S_matrix[m * N + n]);
+						//trV=S(r-z)*S(-z) - S(r)
 						trV_V = trV_V
 							- S_matrix[j * N + i];
 					}
@@ -352,8 +372,8 @@ void Integration_BK_logscale_direct_cpp(std::complex<double>* integrated, std::c
 
 					std::complex<double> coeff = std::complex<double>(
 						simpson1*simpson2
-						*exp(2.0*x_1[j*N + i])
-						/ r_z2,
+						*1.0
+						/ r_z2_o_x2,
 						0.0
 						);
 

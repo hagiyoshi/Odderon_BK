@@ -5,7 +5,7 @@
 
 #define NPHI 16
 
-#define LATTICE_SIZE	 8.0
+#define LATTICE_SIZE	 12.0
 
 #define BSZ		8
 

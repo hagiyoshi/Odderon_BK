@@ -367,10 +367,12 @@ __global__ void Integration_BK_logscale_direct(cuDoubleComplex* integrated, cuDo
 				}
 
 				cuDoubleComplex trV_V = make_cuDoubleComplex(0.0, 0.0);
-				double r_z = 1.0 / 2.0*log(exp(2.0*x_1[j * N + i]) + exp(2.0*x_1[m * N + n])
-											- 2.0*exp(x_1[j * N + i] + x_1[m * N + n])*cos(y_1[j * N + i] - y_1[m * N + n]));
+				double r_z = 1.0 / 2.0*(2.0*x_1[j * N + i] + log(1.0 + exp(2.0*x_1[m * N + n]- 2.0*x_1[j * N + i])
+											- 2.0*exp(-x_1[j * N + i] + x_1[m * N + n])*cos(y_1[j * N + i] - y_1[m * N + n])));
 				double r_z2 = exp(2.0*x_1[j * N + i]) + exp(2.0*x_1[m * N + n])
 					- 2.0*exp(x_1[j * N + i] + x_1[m * N + n])*cos(y_1[j * N + i] - y_1[m * N + n]);
+				double r_z2_o_x2 = 1.0 + exp(2.0*x_1[m * N + n] - 2.0*x_1[j * N + i])
+					- 2.0*exp(-x_1[j * N + i] + x_1[m * N + n])*cos(y_1[j * N + i] - y_1[m * N + n]);
 				double angletocos = (exp(x_1[j * N + i])*cos(y_1[j * N + i]) - exp(x_1[m * N + n]) * cos(y_1[m * N + n])) / sqrt(r_z2);
 				if (angletocos >= 1.0) {
 					//printf("cos is larger than 1 cos if %.6e\n" , angletocos-1.0);
@@ -437,8 +439,7 @@ __global__ void Integration_BK_logscale_direct(cuDoubleComplex* integrated, cuDo
 
 				cuDoubleComplex coeff = make_cuDoubleComplex(
 					simpson1*simpson2
-					*exp(2.0*x_1[j*N + i])
-					/ r_z2,
+					*1.0/r_z2_o_x2,
 					0.0
 				);
 
