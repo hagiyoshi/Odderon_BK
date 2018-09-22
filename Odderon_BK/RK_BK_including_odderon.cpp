@@ -38,7 +38,7 @@ using namespace std;
 
 #define LARGE_Nc
 
-//#define LOGSCALE
+#define LOGSCALE
 
 //for DE formula
 int nfunc;
@@ -66,7 +66,7 @@ const double IMPACTP_B = 1.0;
 /**
 * The evolution step size.
 */
-#define DELTA_T         0.001
+#define DELTA_T         0.01
 #define OUTPUT_DELTA_T  0.1
 #define END_T           5.0
 

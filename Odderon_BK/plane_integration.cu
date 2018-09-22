@@ -79,6 +79,75 @@ __device__ cuDoubleComplex linear_interpolation_Smatrix(cuDoubleComplex* S_matri
 		(1.0 - t)*(1.0 - u)*S_matrix[i_p*NX + i_x].y + t * (1.0 - u)*S_matrix[i_p*NX + i_x + 1].y
 		+ t * u*S_matrix[(i_p + 1)*NX + i_x + 1].y + (1.0 - t)*u*S_matrix[(i_p + 1)*NX + i_x].y
 	);
+	if (interpolate.x > 1.0) {
+		interpolate = make_cuDoubleComplex(
+			1.0,
+			(1.0 - t)*(1.0 - u)*S_matrix[i_p*NX + i_x].y + t * (1.0 - u)*S_matrix[i_p*NX + i_x + 1].y
+			+ t * u*S_matrix[(i_p + 1)*NX + i_x + 1].y + (1.0 - t)*u*S_matrix[(i_p + 1)*NX + i_x].y
+		);
+	}
+	else if (interpolate.y < 0.0) {
+		interpolate = make_cuDoubleComplex(
+			0.0,
+			(1.0 - t)*(1.0 - u)*S_matrix[i_p*NX + i_x].y + t * (1.0 - u)*S_matrix[i_p*NX + i_x + 1].y
+			+ t * u*S_matrix[(i_p + 1)*NX + i_x + 1].y + (1.0 - t)*u*S_matrix[(i_p + 1)*NX + i_x].y
+		);
+	}
+
+	return interpolate;
+}
+
+__device__ cuDoubleComplex linear_interpolation_Smatrix_fowardonly(cuDoubleComplex* S_matrix,
+	double* x_1, double* p_1, double x, double p)
+{
+	double h = 1.0*LATTICE_SIZE / NX;
+	double h_theta = 2.0*Pi / NPHI;
+	double   xmax = h * NX / 4.0, xmin = -h * NX *3.0 / 4.0, ymin = 0.0;
+	int i_x = 0;
+	int i_p = 0;
+
+	for (int i = 0; i < NX - 1; i++)
+	{
+		//double dx = x_1[i];
+		double dx = double(i)*h + xmin;
+		double diffdx = dx - x;
+		//printf("i %d \n", i);
+		if (0.0 > diffdx) {
+			i_x = i;
+			//printf(" if in dx - x %.3e ,i_x %d \n", diffdx , i_x);
+		}
+		else {
+			//printf("finish dx - x %.3e ,i_x %d \n", diffdx, i_x); 
+			continue;
+		}
+	}
+
+	for (int i = 0; i < NPHI - 1; i++)
+	{
+		//double dp = p_1[NX*i];
+		double dp = double(i)*h_theta;
+		double diffdp = dp - p;
+		if (0.0 > diffdp) { i_p = i; }
+		else { continue; }
+	}
+
+	if (x > x_1[NX - 1] || p > 2.0*Pi || x < x_1[0] || p < ymin)
+	{
+		printf("out of range \n");
+		assert(1);
+	}
+
+	//printf("i_x %d , i_p %d ,x_1[i_x] %.3e , p_1[i_p] %.3e , x %.3e , p %.3e \n" , i_x, i_p, x_1[i_x], p_1[NX*i_p], x, p);
+	//bilinear interpolation
+	double t = (x - x_1[i_x]) / (x_1[i_x + 1] - x_1[i_x]);
+	double u = (p - p_1[NX*i_p]) / (p_1[NX*(i_p + 1)] - p_1[NX*i_p]);
+
+	cuDoubleComplex interpolate;
+
+	interpolate = make_cuDoubleComplex(
+		S_matrix[i_p*NX + i_x].x,
+		S_matrix[i_p*NX + i_x].y
+	);
 
 	return interpolate;
 }
@@ -312,7 +381,29 @@ __global__ void Integration_BK_logscale_direct(cuDoubleComplex* integrated, cuDo
 					angletocos = -1.0;
 				}
 				//if r-z is out of the region then we take the S(r-z) =0.
-				if (r_z < xmin || r_z > xmax - h) {
+				if (r_z < xmin ) {
+					cuDoubleComplex unit = make_cuDoubleComplex(1.0,0.0);
+					//trV=S(r-z)
+					trV_V = cuCadd(trV_V,
+						unit
+					);
+					//trV=S(r-z)*S(-z) <- S(-x) = S(x)^*
+					trV_V = cuCmul(trV_V,
+						cuConj(S_matrix[m * N + n]));
+					//trV= - S(r)
+					trV_V = cuCsub(trV_V,
+						S_matrix[j * N + i]);
+				}
+				else if (r_z > xmax - h) {
+
+					cuDoubleComplex zero = make_cuDoubleComplex(0.0, 0.0);
+					//trV=S(r-z)
+					trV_V = cuCadd(trV_V,
+						zero
+					);
+					//trV=S(r-z)*S(-z) <- S(-x) = S(x)^*
+					trV_V = cuCmul(trV_V,
+						cuConj(S_matrix[m * N + n]));
 					//trV= - S(r)
 					trV_V = cuCsub(trV_V,
 						S_matrix[j * N + i]);
@@ -325,8 +416,7 @@ __global__ void Integration_BK_logscale_direct(cuDoubleComplex* integrated, cuDo
 
 					//trV=S(r-z)
 					trV_V = cuCadd(trV_V,
-						linear_interpolation_Smatrix(S_matrix,x_1,y_1,r_z,
-								acos(angletocos) )
+						linear_interpolation_Smatrix(S_matrix,x_1,y_1,r_z,acos(angletocos) )
 					);
 					//trV=S(r-z)*S(-z) <- S(-x) = S(x)^*
 					trV_V = cuCmul(trV_V,
