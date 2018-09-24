@@ -66,9 +66,9 @@ const double IMPACTP_B = 1.0;
 /**
 * The evolution step size.
 */
-#define DELTA_T         0.01
-#define OUTPUT_DELTA_T  0.1
-#define END_T           5.0
+#define DELTA_T         0.1
+#define OUTPUT_DELTA_T  5.0
+#define END_T           25.0
 
 
 /**
@@ -129,6 +129,56 @@ void init_BK_log(std::complex<double>* Smatrix_in) {
 
 }
 
+
+//S=S0+iQ = 1-N -> N = 1-S0 + iQ'
+void init_BK_log_Ncalculation(std::complex<double>* Smatrix_in) {
+	//tau = 0;
+	int N = NX;
+	double h = 1.0*LATTICE_SIZE / NX;
+	double h_theta = 2.0*Pi / NPHI;
+	double   xmax = h * NX / 4.0, xmin = -h * NX *3.0 / 4.0, ymin = 0.0;
+	double   *x = new double[N*N], *y = new double[N*N];
+	for (int j = 0; j < NPHI; j++) {
+		for (int i = 0; i < NX; i++)
+		{
+			x[NX*j + i] = xmin + i * h;
+			y[NX*j + i] = ymin + j * h_theta;
+			Smatrix_in[NX*j + i] = complex<double>(
+				1.0-exp(-exp(2.0*x[NX*j + i])*initialQ0*initialQ0),
+				exp(-exp(2.0*x[NX*j + i])*initialQ0*initialQ0)
+				*exp(3.0*x[NX*j + i])*sin(y[NX*j + i])
+				* initial_C
+				);
+		}
+	}
+
+
+}
+
+
+
+//S=S0+iQ = 1-N -> N = 1-S0 + iQ'
+void init_BK_log_Ncalculation_one(std::complex<double>* Smatrix_in) {
+	//tau = 0;
+	int N = NX;
+	double h = 1.0*LATTICE_SIZE / NX;
+	double h_theta = 2.0*Pi / NPHI;
+	double   xmax = h * NX / 4.0, xmin = -h * NX *3.0 / 4.0, ymin = 0.0;
+	double   *x = new double[N*N], *y = new double[N*N];
+	for (int j = 0; j < NPHI; j++) {
+		for (int i = 0; i < NX; i++)
+		{
+			x[NX*j + i] = xmin + i * h;
+			y[NX*j + i] = ymin + j * h_theta;
+			Smatrix_in[NX*j + i] = complex<double>(
+				exp(-exp(2.0*x[NX*j + i])*initialQ0*initialQ0),
+				0.0
+				);
+		}
+	}
+
+
+}
 
 //input S_matrix NX*NPHI, x_1 NX, p_1 PHI;
 std::complex<double> linear_interpolation_Smatrix_cpp(std::complex<double>* S_matrix,
@@ -692,6 +742,8 @@ int main(){
 
 #ifdef LOGSCALE
 	init_BK_log(sol_BK_comp.data());
+	//init_BK_log_Ncalculation(sol_BK_comp.data());
+	//init_BK_log_Ncalculation_one(sol_BK_comp.data());
 	print_logscale_g(sol_BK_comp);
 #else
 	init_BK(sol_BK_comp.data());

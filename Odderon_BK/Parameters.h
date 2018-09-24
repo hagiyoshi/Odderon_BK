@@ -1,11 +1,11 @@
 // pi
 #define Pi 3.14159265358979323846264338327950288419716939937508
 
-#define NX	64
+#define NX	128
 
 #define NPHI 16
 
-#define LATTICE_SIZE	 12.0
+#define LATTICE_SIZE	 16.0
 
 #define BSZ		8
 
