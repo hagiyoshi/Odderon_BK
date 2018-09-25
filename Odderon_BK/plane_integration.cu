@@ -550,8 +550,8 @@ __global__ void Integration_BK_logscale_direct_complex(cuDoubleComplex* integrat
 
 
 					trV_V = make_cuDoubleComplex(firstterm.x*secondterm.x - S_matrix[j * N + i].x,
-						//firstterm.y*secondterm.x - firstterm.x*secondterm.y - S_matrix[j * N + i].y
-						-0.1
+						firstterm.y*secondterm.x - firstterm.x*secondterm.y - S_matrix[j * N + i].y
+						//-0.1
 					);
 
 					//cuDoubleComplex subsOO = make_cuDoubleComplex(

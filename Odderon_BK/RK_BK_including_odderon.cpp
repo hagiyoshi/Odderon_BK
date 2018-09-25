@@ -335,13 +335,14 @@ void Integration_BK_logscale_direct_cpp(std::complex<double>* integrated, std::c
 			int index = j * N + i;
 			integrated[index] = std::complex<double>(0.0, 0.0);
 			//sit the index which is center of the gaussian.
+			
 
 			std::complex<double> complex_zero = std::complex<double>(0.0, 0.0);
 			double   xmax = h * NX / 4.0, xmin = -h * NX* 3.0 / 4.0, ymin = 0.0;
 			double h_theta = 2.0*Pi / NPHI;
 			//If x=N*j+i, then -x=N*(N-j)+N-i(when the origin is x= N*N/2 + N/2).
-			for (int m = 0; m < N; m++) {
-				for (int n = 0; n < NPHI; n++) {
+			for (int m = 0; m < NPHI; m++) {
+				for (int n = 0; n < N; n++) {
 					double simpson1 = 1.0;
 					double simpson2 = 1.0;
 
@@ -379,37 +380,49 @@ void Integration_BK_logscale_direct_cpp(std::complex<double>* integrated, std::c
 					if (r_z < xmin) {
 						std::complex<double> unit = std::complex<double>(1.0, 0.0);
 						//trV=S(r-z)
-						trV_V += unit;
+						//trV_V += unit;
 						//trV=S(r-z)*S(-z) <- S(-x) = S(x)^*
-						trV_V = trV_V
-							* std::conj(S_matrix[m * N + n]);
+						//trV_V = trV_V
+						//	* std::conj(S_matrix[m * N + n]);
 						//trV=S(r-z)*S(-z) - S(r)
-						trV_V = trV_V
-							- S_matrix[j * N + i];
+						//trV_V = trV_V
+						//	- S_matrix[j * N + i];
+
+						//trV=S(r-z)*S(-z) - S(r)
+						trV_V = unit * std::conj(S_matrix[m * N + n]) - S_matrix[j * N + i];
 					}
 					else if (r_z > xmax - h) {
 
 						std::complex<double> zero = std::complex<double>(0.0, 0.0);
 						//trV=S(r-z)
-						trV_V += zero;
+						//trV_V += zero;
 						//trV=S(r-z)*S(-z) <- S(-x) = S(x)^*
-						trV_V = trV_V
-							* std::conj(S_matrix[m * N + n]);
+						//trV_V = trV_V
+						//	* std::conj(S_matrix[m * N + n]);
 						//trV=S(r-z)*S(-z) - S(r)
-						trV_V = trV_V
-							- S_matrix[j * N + i];
+						//trV_V = trV_V
+						//	- S_matrix[j * N + i];
+
+						//trV=S(r-z)*S(-z) - S(r)
+						trV_V = zero * std::conj(S_matrix[m * N + n]) - S_matrix[j * N + i];
 					}
 					else {
 						//trV=S(r-z)
-						trV_V = trV_V
-							+ linear_interpolation_Smatrix_cpp(S_matrix, x_1, y_1, r_z,
-								acos(angletocos));
+						//trV_V = trV_V
+						//	+ linear_interpolation_Smatrix_cpp(S_matrix, x_1, y_1, r_z,
+						//		acos(angletocos));
 						//trV=S(r-z)*S(-z) <- S(-x) = S(x)^*
-						trV_V = trV_V
-							* std::conj(S_matrix[m * N + n]);
+						//trV_V = trV_V
+						//	* std::conj(S_matrix[m * N + n]);
 						//trV=S(r-z)*S(-z) - S(r)
-						trV_V = trV_V
-							- S_matrix[j * N + i];
+						//trV_V = trV_V
+						//	- S_matrix[j * N + i];
+
+						//trV=S(r-z)*S(-z) - S(r)
+						trV_V = linear_interpolation_Smatrix_cpp(S_matrix, x_1, y_1, r_z,
+							acos(angletocos))
+							* std::conj(S_matrix[m * N + n]) - S_matrix[j * N + i];
+
 					}//Caution!!! nan * 0 = nan
 					if (((x_1[j * N + i] - x_1[m * N + n])*(x_1[j * N + i] - x_1[m * N + n]) < 1.0e-10 &&
 						(y_1[j * N + i] - y_1[m * N + n])*(y_1[j * N + i] - y_1[m * N + n]) < 1.0e-10) || r_z2 < 0.0) {
@@ -427,19 +440,37 @@ void Integration_BK_logscale_direct_cpp(std::complex<double>* integrated, std::c
 						0.0
 						);
 
-					if (((x_1[m*N + n] - x_1[j*N + i])*(x_1[m*N + n] - x_1[j*N + i])
-						+ (y_1[m*N + n] - y_1[j*N + i])*(y_1[m*N + n] - y_1[j*N + i])) < 1.0e-12
-						|| (x_1[m*N + n] * x_1[m*N + n] + y_1[m*N + n] * y_1[m*N + n]) < 1.0e-12) {
+					if ( ((x_1[j * N + i] - x_1[m * N + n])*(x_1[j * N + i] - x_1[m * N + n]) < 1.0e-10 &&
+						(y_1[j * N + i] - y_1[m * N + n])*(y_1[j * N + i] - y_1[m * N + n]) < 1.0e-10 ) || 
+						((x_1[j * N + i] - x_1[m * N + n])*(x_1[j * N + i] - x_1[m * N + n]) < 1.0e-10 &&
+						(y_1[j * N + i] - y_1[m * N + n] + 2.0*Pi)*(y_1[j * N + i] - y_1[m * N + n] + 2.0*Pi) < 1.0e-10)
+						) {
 						coeff = std::complex<double>(0.0, 0.0);
 					}
 
+					if(coeff != coeff){
+						cout << ((x_1[m*N + n] - x_1[j*N + i])*(x_1[m*N + n] - x_1[j*N + i])
+							+ (y_1[m*N + n] - y_1[j*N + i])*(y_1[m*N + n] - y_1[j*N + i]))
+							<< "\t" << (x_1[m*N + n] * x_1[m*N + n] + y_1[m*N + n] * y_1[m*N + n]) << "\n";
+					}
+					if (trV_V != trV_V) {
+						cout << index << "\t" << m * N + n << "\n";
+					}
 					integrated[index] = integrated[index] + coeff * trV_V;
+
+					if (integrated[index] != integrated[index]) {
+						cout << "internal \t trV_V " << trV_V <<"\t coeff "<<coeff <<"\t index "  << index << "\n";
+					}
 
 				}
 			}
 
 			std::complex<double> coeff2 = std::complex<double>(h*h_theta*ALPHA_S_BAR / 2.0 / Pi, 0.0);
+		
 
+			if (integrated[index] != integrated[index]) {
+				cout << index<< "\n";
+			}
 			integrated[index] = integrated[index] * coeff2;
 		}
 	}
@@ -573,7 +604,8 @@ void f_one_step_logscale_BK_complex(
 		temp_s_BMS_in[veint] = sol_BMS_g_in[veint];
 	}
 
-	Integration_in_logscale_BK_equation(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
+	//Integration_in_logscale_BK_equation(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
+	Integration_in_logscale_BK_equation_cpp(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
 
 }
 
@@ -588,7 +620,8 @@ void s_one_step_logscale_BK_complex(const vector<complex<double>> &K1_g_in,
 		temp_s_BMS_in[veint] = sol_BMS_g_in[veint] + dtau / 2.0*K1_g_in[veint];
 	}
 
-	Integration_in_logscale_BK_equation(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
+	//Integration_in_logscale_BK_equation(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
+	Integration_in_logscale_BK_equation_cpp(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
 
 }
 
