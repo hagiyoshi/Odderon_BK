@@ -86,7 +86,7 @@ __device__ cuDoubleComplex linear_interpolation_Smatrix(cuDoubleComplex* S_matri
 			+ t * u*S_matrix[(i_p + 1)*NX + i_x + 1].y + (1.0 - t)*u*S_matrix[(i_p + 1)*NX + i_x].y
 		);
 	}
-	else if (interpolate.y < 0.0) {
+	else if (interpolate.x < 0.0) {
 		interpolate = make_cuDoubleComplex(
 			0.0,
 			(1.0 - t)*(1.0 - u)*S_matrix[i_p*NX + i_x].y + t * (1.0 - u)*S_matrix[i_p*NX + i_x + 1].y
@@ -568,7 +568,7 @@ __global__ void Integration_BK_logscale_direct_complex(cuDoubleComplex* integrat
 					cuDoubleComplex secondterm = S_matrix[m * N + n];
 
 
-					trV_V = make_cuDoubleComplex(firstterm.x*secondterm.x - S_matrix[j * N + i].x,
+					trV_V = make_cuDoubleComplex(firstterm.x*secondterm.x + firstterm.y*secondterm.y - S_matrix[j * N + i].x,
 						firstterm.y*secondterm.x - firstterm.x*secondterm.y - S_matrix[j * N + i].y
 						//-0.1
 					);
@@ -609,13 +609,13 @@ __global__ void Integration_BK_logscale_direct_complex(cuDoubleComplex* integrat
 					);
 				}
 
-				double outputaddx = output.x + coeff.x*trV_V.x;
+				double outputaddx = coeff.x*trV_V.x;
 				double outputaddy = output.y + coeff.x*trV_V.y;
 
 				output = make_cuDoubleComplex(
-					outputaddx
+					output.x + coeff.x*trV_V.x
 					,
-					outputaddy
+					output.y + coeff.x*trV_V.y
 					
 				);
 
@@ -965,9 +965,9 @@ void Integration_in_logscale_BK_equation(std::complex<double>* Smatrix_in, std::
 	dim3 dimGrid(int((N - 0.5) / BSZ) + 1, int((NPHI - 0.5) / BSZ) + 1);
 	dim3 dimBlock(BSZ, BSZ);
 
-	//Integration_BK_logscale_direct_complex <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, N);
+	Integration_BK_logscale_direct_complex <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, N);
 	//Integration_BK_logscale_direct <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, N);
-	Integration_BK_logscale_direct_Ncalculation <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, N);
+	//Integration_BK_logscale_direct_Ncalculation <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, N);
 	//test_dayo <<<dimGrid, dimBlock >>> ( x_d, y_d);
 	//pickupreal <<<dimGrid, dimBlock >>> ( Integrated_d);
 

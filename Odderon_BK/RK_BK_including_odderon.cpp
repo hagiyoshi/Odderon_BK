@@ -67,8 +67,8 @@ const double IMPACTP_B = 1.0;
 * The evolution step size.
 */
 #define DELTA_T         0.1
-#define OUTPUT_DELTA_T  0.1
-#define END_T           1.0
+#define OUTPUT_DELTA_T  5.0
+#define END_T           25.0
 
 
 /**
@@ -707,8 +707,8 @@ void f_one_step_logscale_BK_complex(
 		temp_s_BMS_in[veint] = sol_BMS_g_in[veint];
 	}
 
-	//Integration_in_logscale_BK_equation(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
-	Integration_in_logscale_BK_equation_cpp(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
+	Integration_in_logscale_BK_equation(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
+	//Integration_in_logscale_BK_equation_cpp(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
 
 }
 
@@ -723,8 +723,8 @@ void s_one_step_logscale_BK_complex(const vector<complex<double>> &K1_g_in,
 		temp_s_BMS_in[veint] = sol_BMS_g_in[veint] + dtau / 2.0*K1_g_in[veint];
 	}
 
-	//Integration_in_logscale_BK_equation(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
-	Integration_in_logscale_BK_equation_cpp(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
+	Integration_in_logscale_BK_equation(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
+	//Integration_in_logscale_BK_equation_cpp(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
 
 }
 
@@ -877,8 +877,8 @@ int main(){
 	double next_tau = 0;
 
 #ifdef LOGSCALE
-	//init_BK_log(sol_BK_comp.data());
-	init_BK_log_Ncalculation(sol_BK_comp.data());
+	init_BK_log(sol_BK_comp.data());
+	//init_BK_log_Ncalculation(sol_BK_comp.data());
 	//init_BK_log_Ncalculation_one(sol_BK_comp.data());
 	print_logscale_g(sol_BK_comp);
 #else
