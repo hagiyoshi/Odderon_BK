@@ -361,7 +361,16 @@ __global__ void Integration_BK_logscale_direct(cuDoubleComplex* integrated, cuDo
 				double simpson1 = 1.0;
 				double simpson2 = 1.0;
 				int diffinitm = m - 0;
+				if (m == 0 || m == NPHI - 1) {
+					simpson1 = 1.0 / 3.0;
+				}
+				else if (m % 2 == 0) {
+					simpson1 = 2.0 / 3.0;
+				}
+				else {
 
+					simpson1 = 4.0 / 3.0;
+				}
 
 				if (n == 0 || n == N - 1) {
 					simpson2 = 1.0 / 3.0;
@@ -498,6 +507,16 @@ __global__ void Integration_BK_logscale_direct_complex(cuDoubleComplex* integrat
 				double simpson2 = 1.0;
 				int diffinitm = m - 0;
 
+				if (m == 0 || m == NPHI - 1) {
+					simpson1 = 1.0 / 3.0;
+				}
+				else if (m % 2 == 0) {
+					simpson1 = 2.0 / 3.0;
+				}
+				else {
+
+					simpson1 = 4.0 / 3.0;
+				}
 
 				if (n == 0 || n == N - 1) {
 					simpson2 = 1.0 / 3.0;
@@ -946,9 +965,9 @@ void Integration_in_logscale_BK_equation(std::complex<double>* Smatrix_in, std::
 	dim3 dimGrid(int((N - 0.5) / BSZ) + 1, int((NPHI - 0.5) / BSZ) + 1);
 	dim3 dimBlock(BSZ, BSZ);
 
-	Integration_BK_logscale_direct_complex <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, N);
+	//Integration_BK_logscale_direct_complex <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, N);
 	//Integration_BK_logscale_direct <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, N);
-	//Integration_BK_logscale_direct_Ncalculation <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, N);
+	Integration_BK_logscale_direct_Ncalculation <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, N);
 	//test_dayo <<<dimGrid, dimBlock >>> ( x_d, y_d);
 	//pickupreal <<<dimGrid, dimBlock >>> ( Integrated_d);
 
