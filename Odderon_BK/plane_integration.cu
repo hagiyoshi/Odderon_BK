@@ -97,54 +97,6 @@ __device__ cuDoubleComplex linear_interpolation_Smatrix(cuDoubleComplex* S_matri
 	return interpolate;
 }
 
-//input S_matrix NX*NPHI, x_1 NX, p_1 PHI;
-__device__ cuDoubleComplex linear_interpolation_Smatrix_test(cuDoubleComplex* S_matrix,
-	double* x_1, double* p_1, double x, double p)
-{
-	double h = 1.0*LATTICE_SIZE / NX;
-	double h_theta = 2.0*Pi / NPHI;
-	double   xmax = h * NX / 4.0, xmin = -h * NX* 3.0/ 4.0, ymin = 0.0;
-	int i_x = 0;
-	int i_p = 0;
-
-	for (int i = 0; i < NX - 1; i++)
-	{
-		if (x < x_1[i]) { i_x = i; }
-	}
-
-	for (int i = 0; i < NPHI - 1; i++)
-	{
-		if (p < p_1[NX*i]) { i_p = i; }
-	}
-
-	if (x > xmax || p > 2.0*Pi || x < xmin || p < ymin)
-	{
-		printf("out of range \n");
-		assert(1);
-	}
-
-	//bilinear interpolation
-	double t = (x - x_1[i_x]) / (x_1[i_x + 1] - x_1[i_x]);
-	double u = (p - p_1[NX*i_p]) / (p_1[NX*(i_p + 1)] - p_1[NX*i_p]);
-
-	cuDoubleComplex interpolate;
-
-	interpolate = make_cuDoubleComplex(
-		(1.0 - t)*(1.0 - u)*S_matrix[i_p*NX + i_x].x + t * (1.0 - u)*S_matrix[i_p*NX + i_x + 1].x
-		+ t * u*S_matrix[(i_p + 1)*NX + i_x + 1].x + (1.0 - t)*u*S_matrix[(i_p + 1)*NX + i_x].x,
-		(1.0 - t)*(1.0 - u)*S_matrix[i_p*NX + i_x].y + t * (1.0 - u)*S_matrix[i_p*NX + i_x + 1].y
-		+ t * u*S_matrix[(i_p + 1)*NX + i_x + 1].y + (1.0 - t)*u*S_matrix[(i_p + 1)*NX + i_x].y
-	);
-
-
-
-	printf("S_matrix[i_p*NX + i_x].x  %.3e , interpolate.x  %.3e ,S_matrix[i_p*NX + i_x].y %.3e , interpolate.y %.3e ,S_matrix[i_p*NX + i_x+1].x %.3e , S_matrix[i_p*NX + i_x+1].y %.3e \n",
-		S_matrix[i_p*NX + i_x].x, interpolate.x, S_matrix[i_p*NX + i_x].y, interpolate.y,
-		S_matrix[i_p*NX + i_x + 1].x, S_matrix[i_p*NX + i_x + 1].y);
-
-	return interpolate;
-}
-
 
 __global__ void Integration_BK_direct(cuDoubleComplex* integrated, cuDoubleComplex* S_matrix,
 	double* x_1, double* y_1, double h, int N_ini, int N_las, int N) {
