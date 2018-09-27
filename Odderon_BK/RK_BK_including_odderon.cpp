@@ -78,7 +78,7 @@ double tau = 0;
 double inter_tau = 0.5;
 
 const double initialQ0 = 1.0;
-const double initial_C = 1.0;
+const double initial_C = 1.0/3.0;
 
 
 void init_BK(std::complex<double>* Smatrix_in){
@@ -146,7 +146,7 @@ void init_BK_log_Ncalculation(std::complex<double>* Smatrix_in) {
 			Smatrix_in[NX*j + i] = complex<double>(
 				1.0-exp(-exp(2.0*x[NX*j + i])*initialQ0*initialQ0),
 				exp(-exp(2.0*x[NX*j + i])*initialQ0*initialQ0)
-				*exp(3.0*x[NX*j + i])*sin(y[NX*j + i])
+				*exp(3.0*x[NX*j + i])*cos(y[NX*j + i])
 				* initial_C
 				);
 		}
@@ -727,6 +727,7 @@ void one_step_logscale_complex(vector<complex<double>> &sol_BK, double dtau) {
 		sol_BK[i] = Old_BK_in[i]
 			+ dtau / 6.0*(K1_g_comp[i] + 2.0*K2_g_comp[i] + 2.0*K3_g_comp[i] + K4_g_comp[i]);
 	}
+
 }
 
 /**
@@ -815,14 +816,80 @@ void print_logscale_g(vector<complex<double>> &sol_BK) {
 
 	for (int i = 0; i < N; i++) {
 
-		ofs_res2 << scientific << exp(x[NX*NPHI/4 + i]) << "\t"
-			<< sol_BK[NX*NPHI / 4 + i].real() << "\t" << sol_BK[NX*NPHI / 4 + i].imag() << endl;
+		ofs_res2 << scientific 
+			//<< exp(x[NX*NPHI/4 + i]) << "\t"
+			//<< sol_BK[NX*NPHI / 4 + i].real() << "\t" << sol_BK[NX*NPHI / 4 + i].imag() << endl;
+			<< exp(x[i]) << "\t"
+			<< sol_BK[ i].real() << "\t" << sol_BK[i].imag() << endl;
 	}
 
 	delete[](x);
 	delete[](y);
 }
 
+void FT_expantion(vector<complex<double>> &sol_BK)
+{
+	int N = NX;
+	double h = 1.0*LATTICE_SIZE / NX;
+	double h_theta = 2.0*Pi / NPHI;
+	double   xmax = h * NX / 4.0, xmin = -h * NX* 3.0 / 4.0, ymin = 0.0;
+	vector<double>   x(2*NX*NPHI,0.0), y(2*NX*NPHI,0.0),y_3(NX*NPHI,0.0);
+	for (int j = 0; j < 2*NPHI; j++) {
+		for (int i = 0; i < NX; i++)
+		{
+			x[NX*j + i] = xmin + i * h;
+			y[NX*j + i] = ymin + j * h_theta;
+		}
+	}
+	vector<complex<double>> sol_BK_comp0(NX, 0), sol_BK_compc1(NX, 0), 
+		sol_BK_compc2(NX, 0), sol_BK_compc3(NX, 0),  sol_BK_comps1(NX, 0),
+		sol_BK_comps2(NX, 0), sol_BK_comps3(NX, 0);
+
+#pragma omp parallel for num_threads(6)
+	for (int i = 0; i < NX; i++) {
+		for (int n = 0; n < NPHI; n++) {
+			sol_BK_comp0[i] += sol_BK[n*NX + i];
+			sol_BK_comps1[i] += sol_BK[n*NX + i] * sin(y[NX*n + i]);
+			sol_BK_comps2[i] += sol_BK[n*NX + i] * sin(2.0*y[NX*n + i]);
+			sol_BK_comps3[i] += sol_BK[n*NX + i] * sin(3.0*y[NX*n + i]);
+			sol_BK_compc1[i] += sol_BK[n*NX + i] * cos(y[NX*n + i]);
+			sol_BK_compc2[i] += sol_BK[n*NX + i] * cos(2.0*y[NX*n + i]);
+			sol_BK_compc3[i] += sol_BK[n*NX + i] * cos(3.0*y[NX*n + i]);
+
+		}
+
+		sol_BK_comp0[i] *= h_theta / 2.0 / Pi;
+		sol_BK_comps1[i] *= h_theta / 1.0 / Pi;
+		sol_BK_comps2[i] *= h_theta / 1.0 / Pi;
+		sol_BK_comps3[i] *= h_theta / 1.0 / Pi;
+		sol_BK_compc1[i] *= h_theta / 1.0 / Pi;
+		sol_BK_compc2[i] *= h_theta / 1.0 / Pi;
+		sol_BK_compc3[i] *= h_theta / 1.0 / Pi;
+	}
+
+
+	ostringstream ofilename;
+	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\BK_logscale_res_FTsin_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
+
+	ofstream ofs_res(ofilename.str().c_str());
+
+	ofs_res << "# r \t Re( S )0 \t Im( S )0 \t Re( S )s1 \t Im( S )s1 \t Re( S )s2 \t Im( S )s2 \t Re( S )s3 \t Im( S )s3 \t "
+		<< "Re( S )c1 \t Im( S )c1 \t Re( S )c2 \t Im( S )c2 \t Re( S )c3\t Im( S )c3 \t initialC"<< initial_C << endl;
+	for (int i = 0; i < NX; i++) {
+
+		ofs_res << scientific << exp(x[i]) 
+			<< "\t" << sol_BK_comp0[i].real() << "\t" << sol_BK_comp0[i].imag()
+			<< "\t" << sol_BK_comps1[i].real() << "\t" << sol_BK_comps1[i].imag()
+			<< "\t" << sol_BK_comps2[i].real() << "\t" << sol_BK_comps2[i].imag()
+			<< "\t" << sol_BK_comps3[i].real() << "\t" << sol_BK_comps3[i].imag()
+			<< "\t" << sol_BK_compc1[i].real() << "\t" << sol_BK_compc1[i].imag()
+			<< "\t" << sol_BK_compc2[i].real() << "\t" << sol_BK_compc2[i].imag()
+			<< "\t" << sol_BK_compc3[i].real() << "\t" << sol_BK_compc3[i].imag()
+			<< "\n";
+	}
+
+}
 
 int main(){
 	time_t t0 = time(NULL);
@@ -856,6 +923,9 @@ int main(){
 	//init_BK_log(sol_BK_comp.data());
 	init_BK_log_Ncalculation(sol_BK_comp.data());
 	print_logscale_g(sol_BK_comp);
+	ofs_res << scientific << tau << "\t" << exp(-NX / 2.0*h_half) << "\t"
+		<< sol_BK_comp[NPHI / 4 * NX + NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + NX / 4].imag() << "\n";
+	FT_expantion(sol_BK_comp);
 #else
 	init_BK(sol_BK_comp.data());
 	print_g(sol_BK_comp);
@@ -877,8 +947,10 @@ int main(){
 		}
 #ifdef LOGSCALE
 		print_logscale_g(sol_BK_comp);
-		ofs_res << scientific << tau << "\t" << exp( 3.0 * NX / 4.0*h_half) << "\t"
-			<< sol_BK_comp[NPHI / 4 * NX + 3 * NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + 3 * NX / 4].imag() << "\n";
+		ofs_res << scientific << tau << "\t" << exp(-NX / 2.0*h_half) << "\t"
+			<< sol_BK_comp[NPHI / 4 * NX +  NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX +  NX / 4].imag() << "\n";
+
+		FT_expantion(sol_BK_comp);
 		cout << "time \t" << tau << "\n";
 #else
 		print_g(sol_BK_comp);
@@ -890,8 +962,10 @@ int main(){
 
 #ifdef LOGSCALE
 	print_logscale_g(sol_BK_comp);
-	ofs_res << scientific << tau << "\t" << exp(3.0 * NX / 4.0*h_half) << "\t"
-		<< sol_BK_comp[NPHI / 4 * NX + 3 * NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + 3 * NX / 4].imag() << "\n";
+	ofs_res << scientific << tau << "\t" << exp(- NX / 2.0*h_half) << "\t"
+		<< sol_BK_comp[NPHI / 4 * NX + NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + NX / 4].imag() << "\n";
+
+	FT_expantion(sol_BK_comp);
 	cout << "time \t" << tau << "\n";
 #else
 	print_g(sol_BK_comp);
