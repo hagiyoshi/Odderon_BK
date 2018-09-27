@@ -149,10 +149,10 @@ __global__ void Integration_BK_direct(cuDoubleComplex* integrated, cuDoubleCompl
 					//trV=S(r-z)
 					trV_V = cuCadd(trV_V,
 						S_matrix[(j - m + N / 2) * N + i - n + N / 2]);
-					//trV=S(r-z)*S(-z) <- S(-x) = S(x)^*
+					//trV=S(r-z)*S(z)
 					trV_V = cuCmul(trV_V,
-						cuConj(S_matrix[m * N + n]));
-					//trV=S(r-z)*S(-z) - S(r)
+						(S_matrix[m * N + n]));
+					//trV=S(r-z)*S(z) - S(r)
 					trV_V = cuCsub(trV_V,
 						S_matrix[j * N + i]);
 				}
@@ -247,9 +247,9 @@ __global__ void Integration_BK_logscale_direct(cuDoubleComplex* integrated, cuDo
 					trV_V = cuCadd(trV_V,
 						unit
 					);
-					//trV=S(r-z)*S(-z) <- S(-x) = S(x)^*
+					//trV=S(r-z)*S(z) 
 					trV_V = cuCmul(trV_V,
-						cuConj(S_matrix[m * N + n]));
+						(S_matrix[m * N + n]));
 					//trV= - S(r)
 					trV_V = cuCsub(trV_V,
 						S_matrix[j * N + i]);
@@ -262,9 +262,9 @@ __global__ void Integration_BK_logscale_direct(cuDoubleComplex* integrated, cuDo
 					trV_V = cuCadd(trV_V,
 						zero
 					);
-					//trV=S(r-z)*S(-z) <- S(-x) = S(x)^*
+					//trV=S(r-z)*S(z)
 					trV_V = cuCmul(trV_V,
-						cuConj(S_matrix[m * N + n]));
+						(S_matrix[m * N + n]));
 					//trV= - S(r)
 					trV_V = cuCsub(trV_V,
 						S_matrix[j * N + i]);
@@ -280,12 +280,12 @@ __global__ void Integration_BK_logscale_direct(cuDoubleComplex* integrated, cuDo
 					trV_V = cuCadd(trV_V,
 						linear_interpolation_Smatrix(S_matrix,x_1,y_1,r_z,acos(angletocos) )
 					);
-					//trV=S(r-z)*S(-z) <- S(-x) = S(x)^*
+					//trV=S(r-z)*S(z)
 					trV_V = cuCmul(trV_V,
-						cuConj(S_matrix[m * N + n]));
+						(S_matrix[m * N + n]));
 
 
-					//trV=S(r-z)*S(-z) - S(r)
+					//trV=S(r-z)*S(z) - S(r)
 					trV_V = cuCsub(trV_V,
 						S_matrix[j * N + i]);
 
@@ -382,19 +382,19 @@ __global__ void Integration_BK_logscale_direct_Ncalculation(cuDoubleComplex* int
 					trV_V = cuCsub(trV_V,
 						zero
 					);
-					//trV=-N(r-z)*N(-z) <- N(-x) = N(x)^*
+					//trV=-N(r-z)*N(z) 
 					trV_V = cuCmul(trV_V,
-						cuConj(S_matrix[m * N + n]));
-					//trV= -N(r-z)*N(-z) - N(r)
-					trV_V = cuCsub(trV_V,
+						(S_matrix[m * N + n]));
+					//trV= -N(r-z)*N(z) - N(r)
+					trV_V = (trV_V,
 						S_matrix[j * N + i]);
-					//trV=N(r-z) -N(r-z)*N(-z) - N(r)
+					//trV=N(r-z) -N(r-z)*N(z) - N(r)
 					trV_V = cuCadd(trV_V,
 						zero
 					);
-					//trV= N(r-z) + N(-z) - N(r-z)*N(-z) - N(r)
+					//trV= N(r-z) + N(z) - N(r-z)*N(-z) - N(r)
 					trV_V = cuCadd(trV_V,
-						cuConj(S_matrix[m * N + n]));
+						(S_matrix[m * N + n]));
 				}
 				else if (r_z > xmax - h) {
 
@@ -403,19 +403,19 @@ __global__ void Integration_BK_logscale_direct_Ncalculation(cuDoubleComplex* int
 					trV_V = cuCsub(trV_V,
 						unit
 					);
-					//trV=-N(r-z)*N(-z) <- N(-x) = N(x)^*
+					//trV=-N(r-z)*N(z) 
 					trV_V = cuCmul(trV_V,
-						cuConj(S_matrix[m * N + n]));
-					//trV= -N(r-z)*N(-z) - N(r)
+						(S_matrix[m * N + n]));
+					//trV= -N(r-z)*N(z) - N(r)
 					trV_V = cuCsub(trV_V,
 						S_matrix[j * N + i]);
-					//trV=N(r-z) -N(r-z)*N(-z) - N(r)
+					//trV=N(r-z) -N(r-z)*N(z) - N(r)
 					trV_V = cuCadd(trV_V,
 						unit
 					);
-					//trV= N(r-z) + N(-z) - N(r-z)*N(-z) - N(r)
+					//trV= N(r-z) + N(z) - N(r-z)*N(z) - N(r)
 					trV_V = cuCadd(trV_V,
-						cuConj(S_matrix[m * N + n]));
+						(S_matrix[m * N + n]));
 				}
 				else {
 					//	Returns of acos
@@ -427,19 +427,19 @@ __global__ void Integration_BK_logscale_direct_Ncalculation(cuDoubleComplex* int
 					trV_V = cuCsub(trV_V,
 						linear_interpolation_Smatrix(S_matrix, x_1, y_1, r_z, acos(angletocos))
 					);
-					//trV=-N(r-z)*N(-z) <- N(-x) = N(x)^*
+					//trV=-N(r-z)*N(z)
 					trV_V = cuCmul(trV_V,
-						cuConj(S_matrix[m * N + n]));
-					//trV=-N(r-z)*N(-z) - N(r)
+						(S_matrix[m * N + n]));
+					//trV=-N(r-z)*N(z) - N(r)
 					trV_V = cuCsub(trV_V,
 						S_matrix[j * N + i]);
-					//trV=N(r-z) -N(r-z)*N(-z) - N(r)
+					//trV=N(r-z) -N(r-z)*N(z) - N(r)
 					trV_V = cuCadd(trV_V,
 						linear_interpolation_Smatrix(S_matrix, x_1, y_1, r_z, acos(angletocos))
 					);
-					//trV= N(r-z) + N(-z) - N(r-z)*N(-z) - N(r)
+					//trV= N(r-z) + N(z) - N(r-z)*N(z) - N(r)
 					trV_V = cuCadd(trV_V,
-						cuConj(S_matrix[m * N + n]));
+						(S_matrix[m * N + n]));
 				}
 				//Caution!!! nan * 0 = nan
 				if (((x_1[j * N + i] - x_1[m * N + n])*(x_1[j * N + i] - x_1[m * N + n]) < 1.0e-10 &&
@@ -558,8 +558,8 @@ void Integration_in_logscale_BK_equation(std::complex<double>* Smatrix_in, std::
 	dim3 dimGrid(int((N - 0.5) / BSZ) + 1, int((NPHI - 0.5) / BSZ) + 1);
 	dim3 dimBlock(BSZ, BSZ);
 
-	Integration_BK_logscale_direct <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, N);
-	//Integration_BK_logscale_direct_Ncalculation <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, N);
+	//Integration_BK_logscale_direct <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, N);
+	Integration_BK_logscale_direct_Ncalculation <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, N);
 
 	cudaError_t err = cudaGetLastError();
 	if (err != cudaSuccess) {

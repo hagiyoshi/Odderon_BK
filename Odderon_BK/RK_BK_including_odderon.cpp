@@ -67,8 +67,8 @@ const double IMPACTP_B = 1.0;
 * The evolution step size.
 */
 #define DELTA_T         0.1
-#define OUTPUT_DELTA_T  5.0
-#define END_T           25.0
+#define OUTPUT_DELTA_T  0.5
+#define END_T           10.0
 
 
 /**
@@ -269,7 +269,7 @@ void Integration_BK_direct_cpp(std::complex<double>* integrated, std::complex<do
 							+ S_matrix[(j - m + N / 2) * N + i - n + N / 2];
 						//trV=S(r-z)*S(-z) <- S(-x) = S(x)^*
 						trV_V = trV_V
-							* std::conj(S_matrix[m * N + n]);
+							* (S_matrix[m * N + n]);
 						//trV=S(r-z)*S(-z) - S(r)
 						trV_V = trV_V
 							- S_matrix[j * N + i];
@@ -367,21 +367,21 @@ void Integration_BK_logscale_direct_cpp(std::complex<double>* integrated, std::c
 						std::complex<double> unit = std::complex<double>(1.0, 0.0);
 
 						//trV=S(r-z)*S(-z) - S(r)
-						trV_V = unit * std::conj(S_matrix[m * N + n]) - S_matrix[j * N + i];
+						trV_V = unit * (S_matrix[m * N + n]) - S_matrix[j * N + i];
 					}
 					else if (r_z > xmax - h) {
 
 						std::complex<double> zero = std::complex<double>(0.0, 0.0);
 
 						//trV=S(r-z)*S(-z) - S(r)
-						trV_V = zero * std::conj(S_matrix[m * N + n]) - S_matrix[j * N + i];
+						trV_V = zero * (S_matrix[m * N + n]) - S_matrix[j * N + i];
 					}
 					else {
 
 						//trV=S(r-z)*S(-z) - S(r)
 						trV_V = linear_interpolation_Smatrix_cpp(S_matrix, x_1, y_1, r_z,
 							acos(angletocos))
-							* std::conj(S_matrix[m * N + n]) - S_matrix[j * N + i];
+							* (S_matrix[m * N + n]) - S_matrix[j * N + i];
 
 					}//Caution!!! nan * 0 = nan
 					if (((x_1[j * N + i] - x_1[m * N + n])*(x_1[j * N + i] - x_1[m * N + n]) < 1.0e-10 &&
@@ -492,24 +492,24 @@ void Integration_BK_logscale_direct_Ncalculation_cpp(std::complex<double>* integ
 					if (r_z < xmin) {
 
 						//trV= N(r-z) + N(-z) - N(r-z)*N(-z) - N(r)
-						trV_V = std::conj(S_matrix[m * N + n]) - S_matrix[j * N + i];
+						trV_V = (S_matrix[m * N + n]) - S_matrix[j * N + i];
 					}
 					else if (r_z > xmax - h) {
 
 						std::complex<double> unit = std::complex<double>(1.0, 0.0);
 
 						//trV= N(r-z) + N(-z) - N(r-z)*N(-z) - N(r)
-						trV_V = unit + std::conj(S_matrix[m * N + n])
-							- unit * std::conj(S_matrix[m * N + n]) - S_matrix[j * N + i];
+						trV_V = unit + (S_matrix[m * N + n])
+							- unit * (S_matrix[m * N + n]) - S_matrix[j * N + i];
 					}
 					else {
 
 						//trV= N(r-z) + N(-z) - N(r-z)*N(-z) - N(r)
 						trV_V = linear_interpolation_Smatrix_cpp(S_matrix, x_1, y_1, r_z,
 								acos(angletocos))
-							+ std::conj(S_matrix[m * N + n])
+							+ (S_matrix[m * N + n])
 							- linear_interpolation_Smatrix_cpp(S_matrix, x_1, y_1, r_z,
-								acos(angletocos)) * std::conj(S_matrix[m * N + n])
+								acos(angletocos)) * (S_matrix[m * N + n])
 							- S_matrix[j * N + i];
 
 					}//Caution!!! nan * 0 = nan
@@ -801,8 +801,8 @@ void print_logscale_g(vector<complex<double>> &sol_BK) {
 		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
 	ofstream ofs_res2(ofilename2.str().c_str());
 
-	ofs_res << "# r \t phi \t Re( S ) \t Im( S )" << endl;
-	ofs_res2 << "# r pi/2 \t Re( S ) \t Im( S )" << endl;
+	ofs_res << "# r \t phi \t Re( N ) \t Im( N ) \t initialC " << initial_C << endl;
+	ofs_res2 << "# r pi/2 \t Re( N ) \t Im( N ) \t initialC " << initial_C << endl;
 
 	for (int i = 0; i < NPHI; i++) {
 		for (int j = 0; j < NX; j++) {
@@ -836,7 +836,7 @@ int main(){
 #endif
 	ofstream ofs_res(ofilename.str().c_str());
 
-	ofs_res << "# tau \t r \t Re( S ) \t Im( S )" << endl;
+	ofs_res << "# tau \t r \t Re( S ) \t Im( S ) \t initialC " << initial_C << endl;
 
 #ifdef LOGSCALE
 	vector<complex<double>> sol_BK_comp(NX*NPHI, 0);
@@ -853,8 +853,8 @@ int main(){
 	double next_tau = 0;
 
 #ifdef LOGSCALE
-	init_BK_log(sol_BK_comp.data());
-	//init_BK_log_Ncalculation(sol_BK_comp.data());
+	//init_BK_log(sol_BK_comp.data());
+	init_BK_log_Ncalculation(sol_BK_comp.data());
 	print_logscale_g(sol_BK_comp);
 #else
 	init_BK(sol_BK_comp.data());
