@@ -139,6 +139,8 @@ void init_BK_log_Ncalculation(std::complex<double>* Smatrix_in) {
 	double   xmax = h * NX / 4.0, xmin = -h * NX *3.0 / 4.0, ymin = 0.0;
 	double   *x = new double[N*N], *y = new double[N*N];
 	for (int j = 0; j < NPHI; j++) {
+		double thetakannsuu = -0.0;
+		if (j < NPHI / 2+1) { thetakannsuu = 100.0; }
 		for (int i = 0; i < NX; i++)
 		{
 			x[NX*j + i] = xmin + i * h;
@@ -146,13 +148,18 @@ void init_BK_log_Ncalculation(std::complex<double>* Smatrix_in) {
 			Smatrix_in[NX*j + i] = complex<double>(
 				1.0-exp(-exp(2.0*x[NX*j + i])*initialQ0*initialQ0),
 				exp(-exp(2.0*x[NX*j + i])*initialQ0*initialQ0)
-				*exp(3.0*x[NX*j + i])*cos(y[NX*j + i])
+				*exp(3.0*x[NX*j + i])*(
+					//thetakannsuu
+					//cos(2.0*y[NX*j + i]) 
+					sin(2.0*y[NX*j + i])
+					)
 				* initial_C
 				);
 		}
 	}
 
-
+	delete[]x;
+	delete[]y;
 }
 
 
@@ -353,6 +360,7 @@ void Integration_BK_logscale_direct_cpp(std::complex<double>* integrated, std::c
 					double r_z2_o_x2 = 1.0 + exp(2.0*x_1[m * N + n] - 2.0*x_1[j * N + i])
 						- 2.0*exp(-x_1[j * N + i] + x_1[m * N + n])*cos(y_1[j * N + i] - y_1[m * N + n]);
 					double angletocos = (exp(x_1[j * N + i])*cos(y_1[j * N + i]) - exp(x_1[m * N + n]) * cos(y_1[m * N + n])) / sqrt(r_z2);
+					double angletosin = (exp(x_1[j * N + i])*sin(y_1[j * N + i]) - exp(x_1[m * N + n]) * sin(y_1[m * N + n])) / sqrt(r_z2);
 					if (angletocos >= 1.0) {
 						//printf("cos is larger than 1 cos if %.6e\n" , angletocos-1.0);
 						angletocos = 1.0;
@@ -377,10 +385,16 @@ void Integration_BK_logscale_direct_cpp(std::complex<double>* integrated, std::c
 						trV_V = zero * (S_matrix[m * N + n]) - S_matrix[j * N + i];
 					}
 					else {
-
+						double angleha = 0.0;
+						if (angletosin >= 0.0) {
+							angleha = acos(angletocos);
+						}
+						else if (angletosin < 0.0) {
+							angleha = 2.0*Pi - acos(angletocos);
+						}
 						//trV=S(r-z)*S(-z) - S(r)
 						trV_V = linear_interpolation_Smatrix_cpp(S_matrix, x_1, y_1, r_z,
-							acos(angletocos))
+							angleha)
 							* (S_matrix[m * N + n]) - S_matrix[j * N + i];
 
 					}//Caution!!! nan * 0 = nan
@@ -478,7 +492,8 @@ void Integration_BK_logscale_direct_Ncalculation_cpp(std::complex<double>* integ
 						- 2.0*exp(x_1[j * N + i] + x_1[m * N + n])*cos(y_1[j * N + i] - y_1[m * N + n]);
 					double r_z2_o_x2 = 1.0 + exp(2.0*x_1[m * N + n] - 2.0*x_1[j * N + i])
 						- 2.0*exp(-x_1[j * N + i] + x_1[m * N + n])*cos(y_1[j * N + i] - y_1[m * N + n]);
-					double angletocos = (exp(x_1[j * N + i])*cos(y_1[j * N + i]) - exp(x_1[m * N + n]) * cos(y_1[m * N + n])) / sqrt(r_z2);
+					double angletocos = (exp(x_1[j * N + i])*cos(y_1[j * N + i]) - exp(x_1[m * N + n]) * cos(y_1[m * N + n])) / sqrt(r_z2); 
+					double angletosin = (exp(x_1[j * N + i])*sin(y_1[j * N + i]) - exp(x_1[m * N + n]) * sin(y_1[m * N + n])) / sqrt(r_z2);
 					if (angletocos >= 1.0) {
 						//printf("cos is larger than 1 cos if %.6e\n" , angletocos-1.0);
 						angletocos = 1.0;
@@ -503,13 +518,19 @@ void Integration_BK_logscale_direct_Ncalculation_cpp(std::complex<double>* integ
 							- unit * (S_matrix[m * N + n]) - S_matrix[j * N + i];
 					}
 					else {
-
+						double angleha = 0.0;
+						if (angletosin >= 0.0) {
+							angleha = acos(angletocos);
+						}
+						else if (angletosin < 0.0) {
+							angleha = 2.0*Pi - acos(angletocos);
+						}
 						//trV= N(r-z) + N(-z) - N(r-z)*N(-z) - N(r)
 						trV_V = linear_interpolation_Smatrix_cpp(S_matrix, x_1, y_1, r_z,
-								acos(angletocos))
+							angleha)
 							+ (S_matrix[m * N + n])
 							- linear_interpolation_Smatrix_cpp(S_matrix, x_1, y_1, r_z,
-								acos(angletocos)) * (S_matrix[m * N + n])
+								angleha) * (S_matrix[m * N + n])
 							- S_matrix[j * N + i];
 
 					}//Caution!!! nan * 0 = nan
@@ -781,6 +802,57 @@ void print_g(vector<complex<double>> &sol_BK) {
 * Prints g_Y.
 */
 void print_logscale_g(vector<complex<double>> &sol_BK) {
+	int N = NX;
+	double h = 1.0*LATTICE_SIZE / NX;
+	double h_theta = 2.0*Pi / NPHI;
+	double   xmax = h * NX / 4.0, xmin = -h * NX*3.0 / 4.0, ymin = 0.0;
+	double   *x = new double[N*NPHI], *y = new double[N*NPHI];
+	for (int j = 0; j < NPHI; j++) {
+		for (int i = 0; i < NX; i++)
+		{
+			x[NX*j + i] = xmin + i * h;
+			y[NX*j + i] = ymin + j * h_theta;
+		}
+	}
+
+	ostringstream ofilename, ofilename2;
+	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\solutions\\BK_logscale_res_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
+	ofstream ofs_res(ofilename.str().c_str());
+	ofilename2 << "G:\\hagiyoshi\\Data\\BK_odderon\\solutions\\BK_logscale_res_distance_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
+	ofstream ofs_res2(ofilename2.str().c_str());
+
+	ofs_res << "# r \t phi \t Re( N ) \t Im( N ) \t initialC " << initial_C << endl;
+	ofs_res2 << "# r pi/2 \t Re( N ) \t Im( N ) \t initialC " << initial_C << endl;
+
+	for (int i = 0; i < NPHI; i++) {
+		for (int j = 0; j < NX; j++) {
+			ofs_res << scientific << exp(x[NX*i + j]) << "\t" << y[NX*i + j] << "\t"
+				<< sol_BK[NX*i + j].real() << "\t" << sol_BK[NX*i + j].imag() << endl;
+		}
+
+		ofs_res << endl;
+	}
+
+	for (int i = 0; i < N; i++) {
+
+		ofs_res2 << scientific
+			<< exp(x[NX*NPHI/4 + i]) << "\t"
+			<< sol_BK[NX*NPHI / 4 + i].real() << "\t" << sol_BK[NX*NPHI / 4 + i].imag() << endl;
+			//<< exp(x[i]) << "\t"
+			//<< sol_BK[i].real() << "\t" << sol_BK[i].imag() << endl;
+	}
+
+	delete[](x);
+	delete[](y);
+}
+
+
+/**
+* Prints g_Y.
+*/
+void print_logscale_g_inicos(vector<complex<double>> &sol_BK) {
 	int N = NX;
 	double h = 1.0*LATTICE_SIZE / NX;
 	double h_theta = 2.0*Pi / NPHI;

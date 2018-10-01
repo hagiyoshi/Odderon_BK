@@ -231,7 +231,9 @@ __global__ void Integration_BK_logscale_direct(cuDoubleComplex* integrated, cuDo
 					- 2.0*exp(x_1[j * N + i] + x_1[m * N + n])*cos(y_1[j * N + i] - y_1[m * N + n]);
 				double r_z2_o_x2 = 1.0 + exp(2.0*x_1[m * N + n] - 2.0*x_1[j * N + i])
 					- 2.0*exp(-x_1[j * N + i] + x_1[m * N + n])*cos(y_1[j * N + i] - y_1[m * N + n]);
-				double angletocos = (exp(x_1[j * N + i])*cos(y_1[j * N + i]) - exp(x_1[m * N + n]) * cos(y_1[m * N + n])) / sqrt(r_z2);
+				double angletocos = (exp(x_1[j * N + i])*cos(y_1[j * N + i]) - exp(x_1[m * N + n]) * cos(y_1[m * N + n])) / sqrt(r_z2); 
+				double angletosin = (exp(x_1[j * N + i])*sin(y_1[j * N + i]) - exp(x_1[m * N + n]) * sin(y_1[m * N + n])) / sqrt(r_z2);
+				
 				if (angletocos >= 1.0) {
 					//printf("cos is larger than 1 cos if %.6e\n" , angletocos-1.0);
 					angletocos = 1.0;
@@ -275,10 +277,16 @@ __global__ void Integration_BK_logscale_direct(cuDoubleComplex* integrated, cuDo
 				//		Result will be in radians, in the interval[0, ƒÎ] for x inside[-1, +1].
 				//		acos(1) returns + 0.
 				//		acos(x) returns NaN for x outside[-1, +1].
-
+					double angleha = 0.0;
+					if (angletosin >= 0.0) {
+						angleha = acos(angletocos);
+					}
+					else if (angletosin < 0.0) {
+						angleha = 2.0*Pi - acos(angletocos);
+					}
 					//trV=S(r-z)
 					trV_V = cuCadd(trV_V,
-						linear_interpolation_Smatrix(S_matrix,x_1,y_1,r_z,acos(angletocos) )
+						linear_interpolation_Smatrix(S_matrix,x_1,y_1,r_z, angleha)
 					);
 					//trV=S(r-z)*S(z)
 					trV_V = cuCmul(trV_V,
@@ -367,6 +375,8 @@ __global__ void Integration_BK_logscale_direct_Ncalculation(cuDoubleComplex* int
 				double r_z2_o_x2 = 1.0 + exp(2.0*x_1[m * N + n] - 2.0*x_1[j * N + i])
 					- 2.0*exp(-x_1[j * N + i] + x_1[m * N + n])*cos(y_1[j * N + i] - y_1[m * N + n]);
 				double angletocos = (exp(x_1[j * N + i])*cos(y_1[j * N + i]) - exp(x_1[m * N + n]) * cos(y_1[m * N + n])) / sqrt(r_z2);
+				double angletosin = (exp(x_1[j * N + i])*sin(y_1[j * N + i]) - exp(x_1[m * N + n]) * sin(y_1[m * N + n]));
+				
 				if (angletocos >= 1.0) {
 					//printf("cos is larger than 1 cos if %.6e\n" , angletocos-1.0);
 					angletocos = 1.0;
@@ -422,10 +432,16 @@ __global__ void Integration_BK_logscale_direct_Ncalculation(cuDoubleComplex* int
 					//		Result will be in radians, in the interval[0, ƒÎ] for x inside[-1, +1].
 					//		acos(1) returns + 0.
 					//		acos(x) returns NaN for x outside[-1, +1].
-
+					double angleha = 0.0;
+					if (angletosin >= 0.0) {
+						angleha = acos(angletocos);
+					}
+					else if (angletosin < 0.0) {
+						angleha = 2.0*Pi - acos(angletocos);
+					}
 						//trV=-N(r-z)
 					trV_V = cuCsub(trV_V,
-						linear_interpolation_Smatrix(S_matrix, x_1, y_1, r_z, acos(angletocos))
+						linear_interpolation_Smatrix(S_matrix, x_1, y_1, r_z, angleha)
 					);
 					//trV=-N(r-z)*N(z)
 					trV_V = cuCmul(trV_V,
@@ -435,7 +451,7 @@ __global__ void Integration_BK_logscale_direct_Ncalculation(cuDoubleComplex* int
 						S_matrix[j * N + i]);
 					//trV=N(r-z) -N(r-z)*N(z) - N(r)
 					trV_V = cuCadd(trV_V,
-						linear_interpolation_Smatrix(S_matrix, x_1, y_1, r_z, acos(angletocos))
+						linear_interpolation_Smatrix(S_matrix, x_1, y_1, r_z, angleha)
 					);
 					//trV= N(r-z) + N(z) - N(r-z)*N(z) - N(r)
 					trV_V = cuCadd(trV_V,
