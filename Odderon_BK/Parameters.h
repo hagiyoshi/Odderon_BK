@@ -3,7 +3,7 @@
 
 #define NX	128
 
-#define NPHI 16
+#define NPHI 32
 
 #define LATTICE_SIZE	 16.0
 

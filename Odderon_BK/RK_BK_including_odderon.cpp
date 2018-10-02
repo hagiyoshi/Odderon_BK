@@ -150,8 +150,8 @@ void init_BK_log_Ncalculation(std::complex<double>* Smatrix_in) {
 				exp(-exp(2.0*x[NX*j + i])*initialQ0*initialQ0)
 				*exp(3.0*x[NX*j + i])*(
 					//thetakannsuu
-					//cos(2.0*y[NX*j + i]) 
-					sin(2.0*y[NX*j + i])
+					cos(1.0*y[NX*j + i]) 
+					//sin(1.0*y[NX*j + i])
 					)
 				* initial_C
 				);
@@ -994,7 +994,8 @@ int main(){
 #ifdef LOGSCALE
 	//init_BK_log(sol_BK_comp.data());
 	init_BK_log_Ncalculation(sol_BK_comp.data());
-	print_logscale_g(sol_BK_comp);
+	//print_logscale_g(sol_BK_comp);
+	print_logscale_g_inicos(sol_BK_comp);
 	ofs_res << scientific << tau << "\t" << exp(-NX / 2.0*h_half) << "\t"
 		<< sol_BK_comp[NPHI / 4 * NX + NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + NX / 4].imag() << "\n";
 	FT_expantion(sol_BK_comp);
@@ -1018,7 +1019,8 @@ int main(){
 #endif
 		}
 #ifdef LOGSCALE
-		print_logscale_g(sol_BK_comp);
+		//print_logscale_g(sol_BK_comp);
+		print_logscale_g_inicos(sol_BK_comp);
 		ofs_res << scientific << tau << "\t" << exp(-NX / 2.0*h_half) << "\t"
 			<< sol_BK_comp[NPHI / 4 * NX +  NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX +  NX / 4].imag() << "\n";
 
@@ -1033,7 +1035,8 @@ int main(){
 	}
 
 #ifdef LOGSCALE
-	print_logscale_g(sol_BK_comp);
+	//print_logscale_g(sol_BK_comp);
+	print_logscale_g_inicos(sol_BK_comp);
 	ofs_res << scientific << tau << "\t" << exp(- NX / 2.0*h_half) << "\t"
 		<< sol_BK_comp[NPHI / 4 * NX + NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + NX / 4].imag() << "\n";
 
