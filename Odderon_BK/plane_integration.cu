@@ -97,6 +97,19 @@ __device__ cuDoubleComplex linear_interpolation_Smatrix(cuDoubleComplex* S_matri
 	return interpolate;
 }
 
+__device__ double running_alpha_s(double r_2) {
+	return 1.0
+		/ (R_CONST_B0*log(4.0*R_CONST_C*R_CONST_C  / r_2 / QCD_LAMBDA / QCD_LAMBDA + R_CONST_a));
+}
+
+__device__ double integration_kernel(double r_2, double r1_2, double r2_2) {
+	return running_alpha_s(r_2)
+		*(1.0 / r1_2 * (running_alpha_s(r1_2) / running_alpha_s(r2_2) - 1.0)
+			+ r_2 / r1_2 / r2_2
+			+ 1.0 / r2_2 * (running_alpha_s(r2_2) / running_alpha_s(r1_2) - 1.0)
+			);
+}
+
 
 __global__ void Integration_BK_direct(cuDoubleComplex* integrated, cuDoubleComplex* S_matrix,
 	double* x_1, double* y_1, double h, int N_ini, int N_las, int N) {
@@ -494,6 +507,178 @@ __global__ void Integration_BK_logscale_direct_Ncalculation(cuDoubleComplex* int
 }
 
 
+//S=S0+iQ = 1-N -> N = 1-S0 + iQ'
+__global__ void Integration_BK_running_logscale_direct_Ncalculation(cuDoubleComplex* integrated, cuDoubleComplex* S_matrix,
+	double* x_1, double* y_1, double h, int N) {
+
+	int i = threadIdx.x + blockIdx.x*blockDim.x;
+	int j = threadIdx.y + blockIdx.y*blockDim.y;
+	int index = j * N + i;
+	if (i < N && j < NPHI) {
+		integrated[index] = make_cuDoubleComplex(0.0, 0.0);
+		//sit the index which is center of the gaussian.
+
+		double   xmax = h * NX / 4.0, xmin = -h * NX* 3.0 / 4.0, ymin = 0.0;
+		double h_theta = 2.0*Pi / NPHI;
+		cuDoubleComplex complex_zero = make_cuDoubleComplex(0.0, 0.0);
+		//If x=N*j+i, then -x=N*(N-j)+N-i(when the origin is x= N*N/2 + N/2).
+		for (int m = 0; m < NPHI; m++) {
+			for (int n = 0; n < N; n++) {
+				double simpson1 = 1.0;
+				double simpson2 = 1.0;
+				int diffinitm = m - 0;
+
+				if (m == 0 || m == NPHI - 1) {
+					simpson1 = 1.0 / 3.0;
+				}
+				else if (m % 2 == 0) {
+					simpson1 = 2.0 / 3.0;
+				}
+				else {
+
+					simpson1 = 4.0 / 3.0;
+				}
+
+				if (n == 0 || n == N - 1) {
+					simpson2 = 1.0 / 3.0;
+				}
+				else if (n % 2 == 0) {
+					simpson2 = 2.0 / 3.0;
+				}
+				else {
+
+					simpson2 = 4.0 / 3.0;
+				}
+
+				cuDoubleComplex trV_V = make_cuDoubleComplex(0.0, 0.0);
+				double r_z = 1.0 / 2.0*(2.0*x_1[j * N + i] + log(1.0 + exp(2.0*x_1[m * N + n] - 2.0*x_1[j * N + i])
+					- 2.0*exp(-x_1[j * N + i] + x_1[m * N + n])*cos(y_1[j * N + i] - y_1[m * N + n])));
+				double r_z2 = exp(2.0*x_1[j * N + i])*(1.0 + exp(2.0*x_1[m * N + n] - 2.0*x_1[j * N + i])
+					- 2.0*exp(-x_1[j * N + i] + x_1[m * N + n])*cos(y_1[j * N + i] - y_1[m * N + n]));
+				double r_z2_o_x2 = 1.0 + exp(2.0*x_1[m * N + n] - 2.0*x_1[j * N + i])
+					- 2.0*exp(-x_1[j * N + i] + x_1[m * N + n])*cos(y_1[j * N + i] - y_1[m * N + n]);
+				double angletocos = (exp(x_1[j * N + i])*cos(y_1[j * N + i]) - exp(x_1[m * N + n]) * cos(y_1[m * N + n])) / sqrt(r_z2);
+				double angletosin = (exp(x_1[j * N + i])*sin(y_1[j * N + i]) - exp(x_1[m * N + n]) * sin(y_1[m * N + n]));
+
+				if (angletocos >= 1.0) {
+					//printf("cos is larger than 1 cos if %.6e\n" , angletocos-1.0);
+					angletocos = 1.0;
+				}
+				else if (angletocos <= -1.0) {
+					//printf("cos is smaller than -1 cos if %.6e\n", angletocos+1.0);
+					angletocos = -1.0;
+				}
+				//if r-z is out of the region then we take the S(r-z) =0.
+				if (r_z < xmin) {
+					cuDoubleComplex zero = make_cuDoubleComplex(0.0, 0.0);
+					//trV=-N(r-z)
+					trV_V = cuCsub(trV_V,
+						zero
+					);
+					//trV=-N(r-z)*N(z) 
+					trV_V = cuCmul(trV_V,
+						(S_matrix[m * N + n]));
+					//trV= -N(r-z)*N(z) - N(r)
+					trV_V = (trV_V,
+						S_matrix[j * N + i]);
+					//trV=N(r-z) -N(r-z)*N(z) - N(r)
+					trV_V = cuCadd(trV_V,
+						zero
+					);
+					//trV= N(r-z) + N(z) - N(r-z)*N(-z) - N(r)
+					trV_V = cuCadd(trV_V,
+						(S_matrix[m * N + n]));
+				}
+				else if (r_z > xmax - h) {
+
+					cuDoubleComplex unit = make_cuDoubleComplex(1.0, 0.0);
+					//trV=-N(r-z)
+					trV_V = cuCsub(trV_V,
+						unit
+					);
+					//trV=-N(r-z)*N(z) 
+					trV_V = cuCmul(trV_V,
+						(S_matrix[m * N + n]));
+					//trV= -N(r-z)*N(z) - N(r)
+					trV_V = cuCsub(trV_V,
+						S_matrix[j * N + i]);
+					//trV=N(r-z) -N(r-z)*N(z) - N(r)
+					trV_V = cuCadd(trV_V,
+						unit
+					);
+					//trV= N(r-z) + N(z) - N(r-z)*N(z) - N(r)
+					trV_V = cuCadd(trV_V,
+						(S_matrix[m * N + n]));
+				}
+				else {
+					//	Returns of acos
+					//		Result will be in radians, in the interval[0, ƒÎ] for x inside[-1, +1].
+					//		acos(1) returns + 0.
+					//		acos(x) returns NaN for x outside[-1, +1].
+					double angleha = 0.0;
+					if (angletosin >= 0.0) {
+						angleha = acos(angletocos);
+					}
+					else if (angletosin < 0.0) {
+						angleha = 2.0*Pi - acos(angletocos);
+					}
+					//trV=-N(r-z)
+					trV_V = cuCsub(trV_V,
+						linear_interpolation_Smatrix(S_matrix, x_1, y_1, r_z, angleha)
+					);
+					//trV=-N(r-z)*N(z)
+					trV_V = cuCmul(trV_V,
+						(S_matrix[m * N + n]));
+					//trV=-N(r-z)*N(z) - N(r)
+					trV_V = cuCsub(trV_V,
+						S_matrix[j * N + i]);
+					//trV=N(r-z) -N(r-z)*N(z) - N(r)
+					trV_V = cuCadd(trV_V,
+						linear_interpolation_Smatrix(S_matrix, x_1, y_1, r_z, angleha)
+					);
+					//trV= N(r-z) + N(z) - N(r-z)*N(z) - N(r)
+					trV_V = cuCadd(trV_V,
+						(S_matrix[m * N + n]));
+				}
+				//Caution!!! nan * 0 = nan
+				if (((x_1[j * N + i] - x_1[m * N + n])*(x_1[j * N + i] - x_1[m * N + n]) < 1.0e-10 &&
+					(y_1[j * N + i] - y_1[m * N + n])*(y_1[j * N + i] - y_1[m * N + n]) < 1.0e-10) || r_z2 < 0.0) {
+					trV_V = make_cuDoubleComplex(
+						0.0
+						,
+						0.0
+					);
+				}
+
+				cuDoubleComplex coeff = make_cuDoubleComplex(
+					simpson1*simpson2
+					*integration_kernel(exp(2.0*x_1[j * N + i]), r_z2, exp(2.0*x_1[m * N + n]))
+					*exp(2.0*x_1[m * N + n]),
+					0.0
+				);
+
+				if ((x_1[j * N + i] - x_1[m * N + n])*(x_1[j * N + i] - x_1[m * N + n]) < 1.0e-10 &&
+					(y_1[j * N + i] - y_1[m * N + n])*(y_1[j * N + i] - y_1[m * N + n]) < 1.0e-10) {
+					coeff = make_cuDoubleComplex(
+						0.0
+						,
+						0.0
+					);
+				}
+
+				integrated[index] = cuCadd(integrated[index], cuCmul(coeff, trV_V));
+
+			}
+		}
+
+		cuDoubleComplex coeff2 = make_cuDoubleComplex(h*h_theta *Nc / 2.0 / Pi / Pi, 0.0);
+
+		integrated[index] = cuCmul(integrated[index], coeff2);
+	}
+}
+
+
+
 void Integration_in_BK_equation(std::complex<double>* Smatrix_in, std::complex<double>* Integrated_out)
 {
 
@@ -573,9 +758,12 @@ void Integration_in_logscale_BK_equation(std::complex<double>* Smatrix_in, std::
 
 	dim3 dimGrid(int((N - 0.5) / BSZ) + 1, int((NPHI - 0.5) / BSZ) + 1);
 	dim3 dimBlock(BSZ, BSZ);
-
+#ifdef RUNNING
+	Integration_BK_running_logscale_direct_Ncalculation << <dimGrid, dimBlock >> > (Integrated_d, S_matrix_d, x_d, y_d, h, N);
+#else
 	//Integration_BK_logscale_direct <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, N);
 	Integration_BK_logscale_direct_Ncalculation <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, N);
+#endif
 
 	cudaError_t err = cudaGetLastError();
 	if (err != cudaSuccess) {
