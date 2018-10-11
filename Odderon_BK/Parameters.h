@@ -13,6 +13,9 @@
 
 #define LATTICE_SIZE	 16.0
 
+
+#define KSPACE_SIZE	 10.0
+
 #define BSZ		8
 
 #define ALPHA_S_BAR		0.2

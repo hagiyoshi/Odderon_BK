@@ -1389,6 +1389,44 @@ void print_logscale_g_running_inicos(vector<complex<double>> &sol_BK) {
 	delete[](y);
 }
 
+double integrand_odderontilde(double x, double k, vector<double>& BK_sin, vector<double>& xvector) {
+
+	tk::spline BKsin;
+	BKsin.set_points(xvector, BK_sin); double result = 0.0;
+	if (x < -12.0|| x>4.0) {
+		result = 0;
+	}
+	else {
+		result = BKsin(x)*_j1(exp(k + x))*exp(2.0*x);
+
+	}
+	return result;
+
+}
+
+
+double integrand_odderontilde_normal(double x, double k, vector<double>& BK_sin, vector<double>& xvector) {
+
+	tk::spline BKsin;
+	BKsin.set_points(xvector, BK_sin);
+	double result = 0.0;
+	if (x*x < 1.0e-10) {
+		result = 0;
+	}
+	else if (x*x > 1000.0) {
+	
+
+		result = 0;
+	
+	}else {
+		result = BKsin(log(x))*_j1(k * x)*x;
+	
+	}
+	return result;
+
+}
+
+
 void FT_expantion_running(vector<complex<double>> &sol_BK)
 {
 	int N = NX;
@@ -1403,12 +1441,14 @@ void FT_expantion_running(vector<complex<double>> &sol_BK)
 			y[NX*j + i] = ymin + j * h_theta;
 		}
 	}
-	vector<complex<double>> sol_BK_comp0(NX, 0), sol_BK_compc1(NX, 0),
+	vector<complex<double>>  sol_BK_comp0(NX, 0), sol_BK_compc1(NX, 0),
 		sol_BK_compc2(NX, 0), sol_BK_compc3(NX, 0), sol_BK_comps1(NX, 0),
-		sol_BK_comps2(NX, 0), sol_BK_comps3(NX, 0);
+		sol_BK_comps2(NX, 0), sol_BK_comps3(NX, 0), sol_BK_Qtilde(NX, 0);
+	vector<double> Vectorx(NX, 0), Odderonsin(NX, 0),kvector(NX,0);
 
 #pragma omp parallel for num_threads(6)
 	for (int i = 0; i < NX; i++) {
+
 		for (int n = 0; n < NPHI; n++) {
 			sol_BK_comp0[i] += sol_BK[n*NX + i];
 			sol_BK_comps1[i] += sol_BK[n*NX + i] * sin(y[NX*n + i]);
@@ -1427,17 +1467,82 @@ void FT_expantion_running(vector<complex<double>> &sol_BK)
 		sol_BK_compc1[i] *= h_theta / 1.0 / Pi;
 		sol_BK_compc2[i] *= h_theta / 1.0 / Pi;
 		sol_BK_compc3[i] *= h_theta / 1.0 / Pi;
+
+		kvector[i] = 1.0* KSPACE_SIZE / double(NX)*i;
+
+		Vectorx[i] = xmin + i * h;
+
+		Odderonsin[i] = sol_BK_comps1[i].imag();
 	}
 
 
-	ostringstream ofilename;
+	vector<double> Odderontilde(NX, 0),ErrorO(NX,0);
+	int lenaw;
+	extern int nfunc;
+	double tiny, aw[8000], i, err;
+
+	lenaw = 8000;
+	tiny = 1.0e-307;
+
+	double hk_grid = LATTICE_SIZE / 4.0 / NX;
+
+	tk::spline BKsin;
+	BKsin.set_points(Vectorx, Odderonsin);
+
+//#pragma omp parallel for num_threads(6)
+	for (int j = 0; j < NX; j++) {
+		i = 0;
+		err = 0;
+
+		double k = x[j];
+		intdeoini(lenaw, tiny, 1.0e-15, aw);
+		nfunc = 0;
+		//intde(std::bind(integrand_odderontilde,placeholders::_1,k,Odderonsin,Vectorx), xmin,xmax, aw, &i, &err);
+		//intde(std::bind(integrand_odderontilde_normal,placeholders::_1, kvector[j],Odderonsin,Vectorx), 0.0,10.0, aw, &i, &err);
+		//intdeo(std::bind(integrand_odderontilde_normal, placeholders::_1, kvector[j], Odderonsin, Vectorx), 0.0, kvector[j], aw, &i, &err);
+		//printf("I_5=int_0^infty sin(x)/x dx\n");
+		//printf(" I_5= %lg\t, err= %lg\t, N= %d\n", i, err, nfunc);
+		for (int m = 0; m < 4*NX; m++) {
+			double simpson1 = 1.0;
+			if (m == 0 || m == 4*NX - 1) {
+				simpson1 = 1.0 / 3.0;
+			}
+			else if (m % 2 == 0) {
+				simpson1 = 2.0 / 3.0;
+			}
+			else {
+
+				simpson1 = 4.0 / 3.0;
+			}
+			double lr = xmin + hk_grid * m;
+
+			i += simpson1
+				*exp(2.0*lr)
+				*_j1(exp(k + lr))
+				*BKsin(lr);
+		}
+
+		//Odderontilde[j]=-2.0*Pi*exp(-k)*i;
+		//ErrorO[j]= 2.0*Pi*exp(-k)*err;
+		Odderontilde[j] = -2.0*Pi*exp(-k)*i*hk_grid;
+		ErrorO[j] = 2.0*Pi*exp(-k)*err*hk_grid;
+		//Odderontilde[j] = -2.0*Pi*kvector[j] *i;
+		//ErrorO[j] = 2.0*Pi*kvector[j] *err;
+	}
+
+
+
+	ostringstream ofilename, ofilename2;
 	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\BK_running_logscale_res_FTsin_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
+	ofilename2 << "G:\\hagiyoshi\\Data\\BK_odderon\\BK_running_logscale_Oddtilde"
 		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
 
 	ofstream ofs_res(ofilename.str().c_str());
+	ofstream ofs_res2(ofilename2.str().c_str());
 
 	ofs_res << "# r \t Re( S )0 \t Im( S )0 \t Re( S )s1 \t Im( S )s1 \t Re( S )s2 \t Im( S )s2 \t Re( S )s3 \t Im( S )s3 \t "
-		<< "Re( S )c1 \t Im( S )c1 \t Re( S )c2 \t Im( S )c2 \t Re( S )c3\t Im( S )c3 \t initialC" << initial_C << endl;
+		<< "Re( S )c1 \t Im( S )c1 \t Re( S )c2 \t Im( S )c2 \t Re( S )c3\t Im( S )c3 \t Re( S ) Y=0 analytic\t Im( S )s1 Y=0 analytic \t initialC" << initial_C << endl;
 	for (int i = 0; i < NX; i++) {
 
 		ofs_res << scientific << exp(x[i])
@@ -1448,9 +1553,22 @@ void FT_expantion_running(vector<complex<double>> &sol_BK)
 			<< "\t" << sol_BK_compc1[i].real() << "\t" << sol_BK_compc1[i].imag()
 			<< "\t" << sol_BK_compc2[i].real() << "\t" << sol_BK_compc2[i].imag()
 			<< "\t" << sol_BK_compc3[i].real() << "\t" << sol_BK_compc3[i].imag()
+			<< "\t" << 1.0-exp(-initialQ0* initialQ0/4.0*exp(2.0*x[i])*log(1.0* exp(-x[i])/ QCD_LAMBDA + exp(1.0)) ) 
+			<< "\t" << initial_C* initialQ0* initialQ0*initialQ0/8.0*exp(3.0*x[i])
+							*exp(-initialQ0 * initialQ0 / 4.0*exp(2.0*x[i])*log(1.0* exp(-x[i]) / QCD_LAMBDA + exp(1.0)))
 			<< "\n";
 	}
 
+
+	ofs_res2 << "# k \t tilde(O)(k) \t error \t initialC" << initial_C << endl;
+	for (int i = 0; i < NX; i++) {
+
+		ofs_res2 << scientific 
+			<< exp(x[i])
+			//<< kvector[i]
+			<< "\t" << Odderontilde[i] << "\t" << ErrorO[i]
+			<< "\n";
+	}
 }
 
 void running_coupling() {
