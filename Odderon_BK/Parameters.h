@@ -7,7 +7,7 @@
 #define	  	Nc		  	3
 
 
-#define NX	128
+#define NX	256
 
 #define NPHI 32
 
@@ -19,6 +19,7 @@
 #define BSZ		8
 
 #define ALPHA_S_BAR		0.2
+#define ALPHA_S		0.2
 
 #define QCD_LAMBDA	0.241
 

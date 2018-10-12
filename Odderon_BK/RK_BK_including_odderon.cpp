@@ -77,6 +77,9 @@ double inter_tau = 0.5;
 const double initialQ0 = 2.0;
 const double initial_C = 1.0/3.0;
 
+const double proton_mass = 1.0;
+const double proton_radius = 0.5 / 200.0*1000.0;
+
 
 void init_BK(std::complex<double>* Smatrix_in){
 	//tau = 0;
@@ -1103,6 +1106,7 @@ void FT_expantion(vector<complex<double>> &sol_BK)
 	vector<complex<double>> sol_BK_comp0(NX, 0), sol_BK_compc1(NX, 0), 
 		sol_BK_compc2(NX, 0), sol_BK_compc3(NX, 0),  sol_BK_comps1(NX, 0),
 		sol_BK_comps2(NX, 0), sol_BK_comps3(NX, 0);
+	vector<double> Vectorx(NX, 0), Odderonsin(NX, 0), kvector(NX, 0);
 
 #pragma omp parallel for num_threads(6)
 	for (int i = 0; i < NX; i++) {
@@ -1124,14 +1128,83 @@ void FT_expantion(vector<complex<double>> &sol_BK)
 		sol_BK_compc1[i] *= h_theta / 1.0 / Pi;
 		sol_BK_compc2[i] *= h_theta / 1.0 / Pi;
 		sol_BK_compc3[i] *= h_theta / 1.0 / Pi;
+
+
+
+		kvector[i] = 1.0* KSPACE_SIZE / double(NX)*i;
+
+		Vectorx[i] = xmin + i * h;
+
+		Odderonsin[i] = sol_BK_comps1[i].imag();
+	}
+
+	vector<double> Odderontilde(NX, 0), ErrorO(NX, 0), ToddTMD(NX, 0), ToddTMDk4(NX, 0);
+	int lenaw;
+	extern int nfunc;
+	double tiny, aw[8000];
+
+	lenaw = 8000;
+	tiny = 1.0e-307;
+
+	double hk_grid = LATTICE_SIZE / 4.0 / NX;
+
+	tk::spline BKsin;
+	BKsin.set_points(Vectorx, Odderonsin);
+
+	//#pragma omp parallel for num_threads(6)
+	for (int j = 0; j < NX; j++) {
+		double i = 0;
+		double err = 0;
+
+		double k = x[j];
+		intdeoini(lenaw, tiny, 1.0e-15, aw);
+		nfunc = 0;
+		//intde(std::bind(integrand_odderontilde,placeholders::_1,k,Odderonsin,Vectorx), xmin,xmax, aw, &i, &err);
+		//intde(std::bind(integrand_odderontilde_normal,placeholders::_1, kvector[j],Odderonsin,Vectorx), 0.0,10.0, aw, &i, &err);
+		//intdeo(std::bind(integrand_odderontilde_normal, placeholders::_1, kvector[j], Odderonsin, Vectorx), 0.0, kvector[j], aw, &i, &err);
+		//printf("I_5=int_0^infty sin(x)/x dx\n");
+		//printf(" I_5= %lg\t, err= %lg\t, N= %d\n", i, err, nfunc);
+		for (int m = 0; m < 4 * NX; m++) {
+			double simpson1 = 1.0;
+			if (m == 0 || m == 4 * NX - 1) {
+				simpson1 = 1.0 / 3.0;
+			}
+			else if (m % 2 == 0) {
+				simpson1 = 2.0 / 3.0;
+			}
+			else {
+
+				simpson1 = 4.0 / 3.0;
+			}
+			double lr = xmin + hk_grid * m;
+
+			i += simpson1
+				* exp(2.0*lr)
+				*_j1(exp(k + lr))
+				*BKsin(lr);
+		}
+
+		//Odderontilde[j]=-2.0*Pi*exp(-k)*i;
+		//ErrorO[j]= 2.0*Pi*exp(-k)*err;
+		Odderontilde[j] = -2.0*Pi*exp(-k)*i*hk_grid;
+		ErrorO[j] = 2.0*Pi*exp(-k)*err*hk_grid;
+		//Odderontilde[j] = -2.0*Pi*kvector[j] *i;
+		//ErrorO[j] = 2.0*Pi*kvector[j] *err;
+		ToddTMD[j] = i * hk_grid * Pi*proton_radius*proton_radius*proton_mass
+			*exp(1.0*k)*Nc / 2.0 / Pi / ALPHA_S;
+		ToddTMDk4[j] = ToddTMD[j]
+			* exp(4.0*k);
 	}
 
 
-	ostringstream ofilename;
+	ostringstream ofilename, ofilename2;
 	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\BK_logscale_res_FTsin_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
+	ofilename2 << "G:\\hagiyoshi\\Data\\BK_odderon\\BK_logscale_Oddtilde"
 		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
 
 	ofstream ofs_res(ofilename.str().c_str());
+	ofstream ofs_res2(ofilename2.str().c_str());
 
 	ofs_res << "# r \t Re( S )0 \t Im( S )0 \t Re( S )s1 \t Im( S )s1 \t Re( S )s2 \t Im( S )s2 \t Re( S )s3 \t Im( S )s3 \t "
 		<< "Re( S )c1 \t Im( S )c1 \t Re( S )c2 \t Im( S )c2 \t Re( S )c3\t Im( S )c3 \t initialC"<< initial_C << endl;
@@ -1148,6 +1221,15 @@ void FT_expantion(vector<complex<double>> &sol_BK)
 			<< "\n";
 	}
 
+	ofs_res2 << "# k \t tilde(O)(k) \t dipole TMDs\t dipole TMDs timesk^4 \t initialC" << initial_C << endl;
+	for (int i = 0; i < NX; i++) {
+
+		ofs_res2 << scientific
+			<< exp(x[i])
+			//<< kvector[i]
+			<< "\t" << Odderontilde[i] << "\t" << ToddTMD[i] << "\t" << ToddTMDk4[i]
+			<< "\n";
+	}
 }
 
 void constant_coupling(){
@@ -1476,10 +1558,10 @@ void FT_expantion_running(vector<complex<double>> &sol_BK)
 	}
 
 
-	vector<double> Odderontilde(NX, 0),ErrorO(NX,0);
+	vector<double> Odderontilde(NX, 0),ErrorO(NX,0), ToddTMD(NX, 0), ToddTMDk4(NX, 0);
 	int lenaw;
 	extern int nfunc;
-	double tiny, aw[8000], i, err;
+	double tiny, aw[8000];
 
 	lenaw = 8000;
 	tiny = 1.0e-307;
@@ -1491,8 +1573,8 @@ void FT_expantion_running(vector<complex<double>> &sol_BK)
 
 //#pragma omp parallel for num_threads(6)
 	for (int j = 0; j < NX; j++) {
-		i = 0;
-		err = 0;
+		double i = 0;
+		double err = 0;
 
 		double k = x[j];
 		intdeoini(lenaw, tiny, 1.0e-15, aw);
@@ -1528,6 +1610,10 @@ void FT_expantion_running(vector<complex<double>> &sol_BK)
 		ErrorO[j] = 2.0*Pi*exp(-k)*err*hk_grid;
 		//Odderontilde[j] = -2.0*Pi*kvector[j] *i;
 		//ErrorO[j] = 2.0*Pi*kvector[j] *err;
+		ToddTMD[j] = i * hk_grid * Pi*proton_radius*proton_radius*proton_mass
+			*exp(1.0*k)*Nc / 2.0/ Pi / ALPHA_S;
+		ToddTMDk4[j] = ToddTMD[j]
+			*exp(4.0*k);
 	}
 
 
@@ -1560,13 +1646,13 @@ void FT_expantion_running(vector<complex<double>> &sol_BK)
 	}
 
 
-	ofs_res2 << "# k \t tilde(O)(k) \t error \t initialC" << initial_C << endl;
+	ofs_res2 << "# k \t tilde(O)(k) \t dipole TMDs\t dipole TMDs timesk^4 \t initialC" << initial_C << endl;
 	for (int i = 0; i < NX; i++) {
 
 		ofs_res2 << scientific 
 			<< exp(x[i])
 			//<< kvector[i]
-			<< "\t" << Odderontilde[i] << "\t" << ErrorO[i]
+			<< "\t" << Odderontilde[i] << "\t" << ToddTMD[i] << "\t" << ToddTMDk4[i]
 			<< "\n";
 	}
 }
