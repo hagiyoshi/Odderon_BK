@@ -64,8 +64,8 @@ const double IMPACTP_B = 1.0;
 * The evolution step size.
 */
 #define DELTA_T         0.1
-#define OUTPUT_DELTA_T  0.5
-#define END_T           10.0
+#define OUTPUT_DELTA_T  0.1
+#define END_T           0.1
 
 
 /**
@@ -80,6 +80,7 @@ const double initial_C = 1.0/3.0;
 const double proton_mass = 1.0;
 const double proton_radius = 0.5 / 200.0*1000.0;
 
+double  sol_TMD_comp[NX];
 
 void init_BK(std::complex<double>* Smatrix_in){
 	//tau = 0;
@@ -188,6 +189,41 @@ void init_BK_running_log_Ncalculation(std::complex<double>* Smatrix_in) {
 				1.0 - exp(-exp(2.0*x[NX*j + i])*initialQ0*initialQ0 / 4.0
 							*log(1.0/QCD_LAMBDA/ exp(x[NX*j + i]) + exp(1.0))),
 				exp(-exp(2.0*x[NX*j + i])*initialQ0*initialQ0/4.0
+					*log(1.0 / QCD_LAMBDA / exp(x[NX*j + i]) + exp(1.0)))
+				*exp(3.0*x[NX*j + i])*initialQ0*initialQ0*initialQ0 / 8.0
+				*(
+					//thetakannsuu
+					//cos(1.0*y[NX*j + i]) 
+					sin(1.0*y[NX*j + i])
+					)
+				* initial_C
+				);
+		}
+	}
+
+	delete[]x;
+	delete[]y;
+}
+
+
+//S=S0+iQ = 1-N -> N = 1-S0 + iQ'
+void init_BK_running_log_Ncalculation_pureodd(std::complex<double>* Smatrix_in) {
+	//tau = 0;
+	int N = NX;
+	double h = 1.0*LATTICE_SIZE / NX;
+	double h_theta = 2.0*Pi / NPHI;
+	double   xmax = h * NX / 4.0, xmin = -h * NX *3.0 / 4.0, ymin = 0.0;
+	double   *x = new double[N*N], *y = new double[N*N];
+	for (int j = 0; j < NPHI; j++) {
+		double thetakannsuu = -0.0;
+		if (j < NPHI / 2 + 1) { thetakannsuu = 100.0; }
+		for (int i = 0; i < NX; i++)
+		{
+			x[NX*j + i] = xmin + i * h;
+			y[NX*j + i] = ymin + j * h_theta;
+			Smatrix_in[NX*j + i] = complex<double>(
+				0.0,
+				exp(-exp(2.0*x[NX*j + i])*initialQ0*initialQ0 / 4.0
 					*log(1.0 / QCD_LAMBDA / exp(x[NX*j + i]) + exp(1.0)))
 				*exp(3.0*x[NX*j + i])*initialQ0*initialQ0*initialQ0 / 8.0
 				*(
@@ -1421,6 +1457,147 @@ void print_logscale_g_running(vector<complex<double>> &sol_BK) {
 	delete[](y);
 }
 
+
+/**
+* Prints g_Y.
+*/
+void print_logscale_g_running_pureodd(vector<complex<double>> &sol_BK) {
+	int N = NX;
+	double h = 1.0*LATTICE_SIZE / NX;
+	double h_theta = 2.0*Pi / NPHI;
+	double   xmax = h * NX / 4.0, xmin = -h * NX*3.0 / 4.0, ymin = 0.0;
+	double   *x = new double[N*NPHI], *y = new double[N*NPHI];
+	for (int j = 0; j < NPHI; j++) {
+		for (int i = 0; i < NX; i++)
+		{
+			x[NX*j + i] = xmin + i * h;
+			y[NX*j + i] = ymin + j * h_theta;
+		}
+	}
+
+	ostringstream ofilename, ofilename2;
+	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\running\\BK_running_pureodd_logscale_res_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
+	ofstream ofs_res(ofilename.str().c_str());
+	ofilename2 << "G:\\hagiyoshi\\Data\\BK_odderon\\running\\BK_running_pureodd_logscale_res_distance_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
+	ofstream ofs_res2(ofilename2.str().c_str());
+
+	ofs_res << "# r \t phi \t Re( N ) \t Im( N ) \t initialC " << initial_C << "\t Q0" << initialQ0 << endl;
+	ofs_res2 << "# r pi/2 \t Re( N ) \t Im( N ) \t initialC " << initial_C << "\t Q0" << initialQ0 << endl;
+
+	for (int i = 0; i < NPHI; i++) {
+		for (int j = 0; j < NX; j++) {
+			ofs_res << scientific << exp(x[NX*i + j]) << "\t" << y[NX*i + j] << "\t"
+				<< sol_BK[NX*i + j].real() << "\t" << sol_BK[NX*i + j].imag() << endl;
+		}
+
+		ofs_res << endl;
+	}
+
+	for (int i = 0; i < N; i++) {
+
+		ofs_res2 << scientific
+			<< exp(x[NX*NPHI / 4 + i]) << "\t"
+			<< sol_BK[NX*NPHI / 4 + i].real() << "\t" << sol_BK[NX*NPHI / 4 + i].imag() << endl;
+		//<< exp(x[i]) << "\t"
+		//<< sol_BK[i].real() << "\t" << sol_BK[i].imag() << endl;
+	}
+
+	delete[](x);
+	delete[](y);
+}
+
+
+/**
+* Load g_Y.
+*/
+void Load_BK_sol(vector<complex<double>> &sol_BK,double number_rapidity) {
+	int N = NX;
+	double h = 1.0*LATTICE_SIZE / NX;
+	double h_theta = 2.0*Pi / NPHI;
+	double   xmax = h * NX / 4.0, xmin = -h * NX*3.0 / 4.0, ymin = 0.0;
+	double   *x = new double[N*NPHI], *y = new double[N*NPHI];
+	for (int j = 0; j < NPHI; j++) {
+		for (int i = 0; i < NX; i++)
+		{
+			x[NX*j + i] = xmin + i * h;
+			y[NX*j + i] = ymin + j * h_theta;
+		}
+	}
+
+	ostringstream ifilename, ofilename2;
+	ifilename << "G:\\hagiyoshi\\Data\\BK_odderon\\running\\BK_running_logscale_res_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
+
+	//imput and output file
+
+	std::ifstream ifs(ifilename.str().c_str());
+
+	char str[256];
+	if (ifs.fail())
+	{
+		std::cerr << "failed to load file \t" << number_rapidity << std::endl;
+	}
+	ifs.getline(str, 256 - 1);
+	double r = 0;
+	for (int i = 0; i < NPHI; i++) {
+		for (int j = 0; j < NX; j++) {
+			double realpart = 0;
+			double imaginarypart = 0;
+			ifs >> r >> y[NX*i + j] >> realpart >> imaginarypart;
+			sol_BK[NX*i + j] = complex<double>(realpart, imaginarypart);
+		}
+
+	}
+
+	delete[](x);
+	delete[](y);
+}
+
+void Load_BK_sol_scp(vector<complex<double>> &sol_BK, double number_rapidity) {
+	int N = NX;
+	double h = 1.0*LATTICE_SIZE / NX;
+	double h_theta = 2.0*Pi / NPHI;
+	double   xmax = h * NX / 4.0, xmin = -h * NX*3.0 / 4.0, ymin = 0.0;
+	double   *x = new double[N*NPHI], *y = new double[N*NPHI];
+	for (int j = 0; j < NPHI; j++) {
+		for (int i = 0; i < NX; i++)
+		{
+			x[NX*j + i] = xmin + i * h;
+			y[NX*j + i] = ymin + j * h_theta;
+		}
+	}
+
+	ostringstream ifilename, ofilename2;
+	ifilename << "G:\\hagiyoshi\\Data\\BK_odderon\\N_512_128\\BK_logscale_res_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
+
+	//imput and output file
+
+	std::ifstream ifs(ifilename.str().c_str());
+
+	char str[256];
+	if (ifs.fail())
+	{
+		std::cerr << "failed to load file \t" << number_rapidity << std::endl;
+	}
+	ifs.getline(str, 256 - 1);
+	double r = 0;
+	for (int i = 0; i < NPHI; i++) {
+		for (int j = 0; j < NX; j++) {
+			double realpart = 0;
+			double imaginarypart = 0;
+			ifs >> r >> y[NX*i + j] >> realpart >> imaginarypart;
+			sol_BK[NX*i + j] = complex<double>(realpart, imaginarypart);
+		}
+
+	}
+
+	delete[](x);
+	delete[](y);
+}
+
 /**
 * Prints g_Y.
 */
@@ -1509,7 +1686,7 @@ double integrand_odderontilde_normal(double x, double k, vector<double>& BK_sin,
 }
 
 
-void FT_expantion_running(vector<complex<double>> &sol_BK)
+std::complex<double> FT_expantion_running(vector<complex<double>> &sol_BK)
 {
 	int N = NX;
 	double h = 1.0*LATTICE_SIZE / NX;
@@ -1526,7 +1703,7 @@ void FT_expantion_running(vector<complex<double>> &sol_BK)
 	vector<complex<double>>  sol_BK_comp0(NX, 0), sol_BK_compc1(NX, 0),
 		sol_BK_compc2(NX, 0), sol_BK_compc3(NX, 0), sol_BK_comps1(NX, 0),
 		sol_BK_comps2(NX, 0), sol_BK_comps3(NX, 0), sol_BK_Qtilde(NX, 0);
-	vector<double> Vectorx(NX, 0), Odderonsin(NX, 0),kvector(NX,0);
+	vector<double> Vectorx(NX, 0), Odderonsin(NX, 0),kvector(NX,0),sol_BK0(NX, 0);
 
 #pragma omp parallel for num_threads(6)
 	for (int i = 0; i < NX; i++) {
@@ -1555,10 +1732,12 @@ void FT_expantion_running(vector<complex<double>> &sol_BK)
 		Vectorx[i] = xmin + i * h;
 
 		Odderonsin[i] = sol_BK_comps1[i].imag();
+		sol_BK0[i] = sol_BK_comp0[i].real();
 	}
 
 
-	vector<double> Odderontilde(NX, 0),ErrorO(NX,0), ToddTMD(NX, 0), ToddTMDk4(NX, 0);
+	vector<double> Odderontilde(NX, 0),ErrorO(NX,0), ToddTMD(NX, 0), ToddTMDk4(NX, 0),Smatrix0(NX, 0);
+	vector<double> OdderontildeL(NX, 0), ErrorOL(NX, 0), ToddTMDL(NX, 0), ToddTMDk4L(NX, 0);
 	int lenaw;
 	extern int nfunc;
 	double tiny, aw[8000];
@@ -1568,15 +1747,19 @@ void FT_expantion_running(vector<complex<double>> &sol_BK)
 
 	double hk_grid = LATTICE_SIZE / 4.0 / NX;
 
-	tk::spline BKsin;
+	tk::spline BKsin,BK0;
 	BKsin.set_points(Vectorx, Odderonsin);
+	BK0.set_points(Vectorx, sol_BK0);
 
 //#pragma omp parallel for num_threads(6)
 	for (int j = 0; j < NX; j++) {
 		double i = 0;
+		double in0 = 0;
 		double err = 0;
 
 		double k = x[j];
+		double kL = 40.0 / NX*j;
+		double iL = 0;
 		intdeoini(lenaw, tiny, 1.0e-15, aw);
 		nfunc = 0;
 		//intde(std::bind(integrand_odderontilde,placeholders::_1,k,Odderonsin,Vectorx), xmin,xmax, aw, &i, &err);
@@ -1597,35 +1780,54 @@ void FT_expantion_running(vector<complex<double>> &sol_BK)
 				simpson1 = 4.0 / 3.0;
 			}
 			double lr = xmin + hk_grid * m;
+			double lrL = xmin + hk_grid * m;
 
 			i += simpson1
 				*exp(2.0*lr)
 				*_j1(exp(k + lr))
-				*BKsin(lr);
+				*BKsin(lr); 
+			in0 += simpson1
+				* exp(2.0*lr)
+				*_j0(exp(k + lr))
+				*BK0(lr);
+
+				iL += simpson1
+					* exp(2.0*lr)
+					*_j1(kL*exp( lr))
+					*BKsin(lr);
 		}
 
 		//Odderontilde[j]=-2.0*Pi*exp(-k)*i;
 		//ErrorO[j]= 2.0*Pi*exp(-k)*err;
 		Odderontilde[j] = -2.0*Pi*exp(-k)*i*hk_grid;
+		Smatrix0[j] = 2.0*Pi*in0*hk_grid;
 		ErrorO[j] = 2.0*Pi*exp(-k)*err*hk_grid;
 		//Odderontilde[j] = -2.0*Pi*kvector[j] *i;
 		//ErrorO[j] = 2.0*Pi*kvector[j] *err;
 		ToddTMD[j] = i * hk_grid * Pi*proton_radius*proton_radius*proton_mass
-			*exp(1.0*k)*Nc / 2.0/ Pi / ALPHA_S;
+			*exp(1.0*k)*Nc / 2.0/ Pi / 2.0 / Pi / ALPHA_S;
 		ToddTMDk4[j] = ToddTMD[j]
 			*exp(4.0*k);
+
+		ToddTMDL[j] = iL * hk_grid * Pi*proton_radius*proton_radius*proton_mass
+			*kL*Nc / 2.0 / Pi / 2.0 / Pi / ALPHA_S;
+		ToddTMDk4L[j] = ToddTMDL[j]
+			* kL* kL* kL* kL;
 	}
 
 
 
-	ostringstream ofilename, ofilename2;
+	ostringstream ofilename, ofilename2, ofilename3;
 	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\BK_running_logscale_res_FTsin_size"
 		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
 	ofilename2 << "G:\\hagiyoshi\\Data\\BK_odderon\\BK_running_logscale_Oddtilde"
 		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
+	ofilename3 << "G:\\hagiyoshi\\Data\\BK_odderon\\BK_running_Lcale_TMD"
+		<< 40.0 << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
 
 	ofstream ofs_res(ofilename.str().c_str());
 	ofstream ofs_res2(ofilename2.str().c_str());
+	ofstream ofs_res3(ofilename3.str().c_str());
 
 	ofs_res << "# r \t Re( S )0 \t Im( S )0 \t Re( S )s1 \t Im( S )s1 \t Re( S )s2 \t Im( S )s2 \t Re( S )s3 \t Im( S )s3 \t "
 		<< "Re( S )c1 \t Im( S )c1 \t Re( S )c2 \t Im( S )c2 \t Re( S )c3\t Im( S )c3 \t Re( S ) Y=0 analytic\t Im( S )s1 Y=0 analytic \t initialC" << initial_C << endl;
@@ -1646,33 +1848,488 @@ void FT_expantion_running(vector<complex<double>> &sol_BK)
 	}
 
 
-	ofs_res2 << "# k \t tilde(O)(k) \t dipole TMDs\t dipole TMDs timesk^4 \t initialC" << initial_C << endl;
+	ofs_res2 << "# k \t tilde(O)(k) \t dipole TMDs\t dipole TMDs timesk^4 \t dipole smatrix0 \t tilde(O)(k)/ smatrix0 \t initialC" << initial_C << endl;
 	for (int i = 0; i < NX; i++) {
 
 		ofs_res2 << scientific 
 			<< exp(x[i])
 			//<< kvector[i]
-			<< "\t" << Odderontilde[i] << "\t" << ToddTMD[i] << "\t" << ToddTMDk4[i]
+			<< "\t" << Odderontilde[i] << "\t" << ToddTMD[i] << "\t" << ToddTMDk4[i] 
+			<< "\t" << Smatrix0[i] << "\t" << Odderontilde[i]/Smatrix0[i]
 			<< "\n";
 	}
+
+	ofs_res3 << "# k  \t dipole TMDs\t dipole TMDs timesk^4 \t initialC" << initial_C << endl;
+	for (int i = 0; i < NX; i++) {
+
+		ofs_res3 << scientific
+			<< 40.0 / NX * i
+			//<< kvector[i]
+			<< "\t" << ToddTMDL[i] << "\t" << ToddTMDk4L[i]
+			<< "\n";
+	}
+
+	double peakpos = 0.0;
+	double zeroposition = 0.0;
+
+	tk::spline TMDsin;
+	TMDsin.set_points(Vectorx, ToddTMD);
+	//for (int m = NX/2; m < NX; m++) {
+
+	//	double pppp = TMDsin(x[m]);
+	//if (TMDsin(x[m]) > TMDsin(x[m-1])){
+	//	peakpos = x[m];
+
+	//}
+	//else { break; }
+
+	//}
+
+
+	double Newfx = Vectorx[3 * NX / 4] + 0.5;
+	for (;;) {
+
+		if (TMDsin.Fst_deriv(Newfx)*TMDsin.Fst_deriv(Newfx) < 1.0e-4) {
+			break;
+		}
+		else {
+			Newfx = Newfx - TMDsin.Fst_deriv(Newfx) / TMDsin.Sec_deriv(Newfx);
+		}
+
+	}
+	//for (int m = NX / 2; m < NX; m++) {
+	//	if (TMDsin(x[m]) > 0.0) {
+	//		double zzzz = TMDsin(x[m]);
+	//		zeroposition = x[m];
+
+	//	}
+	//	else { break; }
+	//}
+
+	double Newx = Newfx+0.5;
+	for (;;) {
+
+		if (TMDsin(Newx)*TMDsin(Newx) < 1.0e-4) {
+			break;
+		}
+		else {
+			Newx = Newx - TMDsin(Newx) / TMDsin.Fst_deriv(Newx);
+		}
+
+	}
+
+	return std::complex<double>(Newfx, Newx);
+}
+
+std::complex<double> FT_expantion_running_pureodd(vector<complex<double>> &sol_BK)
+{
+	int N = NX;
+	double h = 1.0*LATTICE_SIZE / NX;
+	double h_theta = 2.0*Pi / NPHI;
+	double   xmax = h * NX / 4.0, xmin = -h * NX* 3.0 / 4.0, ymin = 0.0;
+	vector<double>   x(2 * NX*NPHI, 0.0), y(2 * NX*NPHI, 0.0), y_3(NX*NPHI, 0.0);
+	for (int j = 0; j < 2 * NPHI; j++) {
+		for (int i = 0; i < NX; i++)
+		{
+			x[NX*j + i] = xmin + i * h;
+			y[NX*j + i] = ymin + j * h_theta;
+		}
+	}
+	vector<complex<double>>  sol_BK_comp0(NX, 0), sol_BK_compc1(NX, 0),
+		sol_BK_compc2(NX, 0), sol_BK_compc3(NX, 0), sol_BK_comps1(NX, 0),
+		sol_BK_comps2(NX, 0), sol_BK_comps3(NX, 0), sol_BK_Qtilde(NX, 0);
+	vector<double> Vectorx(NX, 0), Odderonsin(NX, 0), kvector(NX, 0), sol_BK0(NX, 0);
+
+#pragma omp parallel for num_threads(6)
+	for (int i = 0; i < NX; i++) {
+
+		for (int n = 0; n < NPHI; n++) {
+			sol_BK_comp0[i] += sol_BK[n*NX + i];
+			sol_BK_comps1[i] += sol_BK[n*NX + i] * sin(y[NX*n + i]);
+			sol_BK_comps2[i] += sol_BK[n*NX + i] * sin(2.0*y[NX*n + i]);
+			sol_BK_comps3[i] += sol_BK[n*NX + i] * sin(3.0*y[NX*n + i]);
+			sol_BK_compc1[i] += sol_BK[n*NX + i] * cos(y[NX*n + i]);
+			sol_BK_compc2[i] += sol_BK[n*NX + i] * cos(2.0*y[NX*n + i]);
+			sol_BK_compc3[i] += sol_BK[n*NX + i] * cos(3.0*y[NX*n + i]);
+
+		}
+
+		sol_BK_comp0[i] *= h_theta / 2.0 / Pi;
+		sol_BK_comps1[i] *= h_theta / 1.0 / Pi;
+		sol_BK_comps2[i] *= h_theta / 1.0 / Pi;
+		sol_BK_comps3[i] *= h_theta / 1.0 / Pi;
+		sol_BK_compc1[i] *= h_theta / 1.0 / Pi;
+		sol_BK_compc2[i] *= h_theta / 1.0 / Pi;
+		sol_BK_compc3[i] *= h_theta / 1.0 / Pi;
+
+		kvector[i] = 1.0* KSPACE_SIZE / double(NX)*i;
+
+		Vectorx[i] = xmin + i * h;
+
+		Odderonsin[i] = sol_BK_comps1[i].imag();
+		sol_BK0[i] = sol_BK_comp0[i].real();
+	}
+
+
+	vector<double> Odderontilde(NX, 0), ErrorO(NX, 0), ToddTMD(NX, 0), ToddTMDk4(NX, 0), Smatrix0(NX, 0);
+	vector<double> OdderontildeL(NX, 0), ErrorOL(NX, 0), ToddTMDL(NX, 0), ToddTMDk4L(NX, 0);
+	int lenaw;
+	extern int nfunc;
+	double tiny, aw[8000];
+
+	lenaw = 8000;
+	tiny = 1.0e-307;
+
+	double hk_grid = LATTICE_SIZE / 4.0 / NX;
+
+	tk::spline BKsin, BK0;
+	BKsin.set_points(Vectorx, Odderonsin);
+	BK0.set_points(Vectorx, sol_BK0);
+
+	//#pragma omp parallel for num_threads(6)
+	for (int j = 0; j < NX; j++) {
+		double i = 0;
+		double in0 = 0;
+		double err = 0;
+
+		double k = x[j];
+		double kL = 40.0 / NX * j;
+		double iL = 0;
+		intdeoini(lenaw, tiny, 1.0e-15, aw);
+		nfunc = 0;
+		//intde(std::bind(integrand_odderontilde,placeholders::_1,k,Odderonsin,Vectorx), xmin,xmax, aw, &i, &err);
+		//intde(std::bind(integrand_odderontilde_normal,placeholders::_1, kvector[j],Odderonsin,Vectorx), 0.0,10.0, aw, &i, &err);
+		//intdeo(std::bind(integrand_odderontilde_normal, placeholders::_1, kvector[j], Odderonsin, Vectorx), 0.0, kvector[j], aw, &i, &err);
+		//printf("I_5=int_0^infty sin(x)/x dx\n");
+		//printf(" I_5= %lg\t, err= %lg\t, N= %d\n", i, err, nfunc);
+		for (int m = 0; m < 4 * NX; m++) {
+			double simpson1 = 1.0;
+			if (m == 0 || m == 4 * NX - 1) {
+				simpson1 = 1.0 / 3.0;
+			}
+			else if (m % 2 == 0) {
+				simpson1 = 2.0 / 3.0;
+			}
+			else {
+
+				simpson1 = 4.0 / 3.0;
+			}
+			double lr = xmin + hk_grid * m;
+			double lrL = xmin + hk_grid * m;
+
+			i += simpson1
+				* exp(2.0*lr)
+				*_j1(exp(k + lr))
+				*BKsin(lr);
+			in0 += simpson1
+				* exp(2.0*lr)
+				*_j0(exp(k + lr))
+				*BK0(lr);
+
+			iL += simpson1
+				* exp(2.0*lr)
+				*_j1(kL*exp(lr))
+				*BKsin(lr);
+		}
+
+		//Odderontilde[j]=-2.0*Pi*exp(-k)*i;
+		//ErrorO[j]= 2.0*Pi*exp(-k)*err;
+		Odderontilde[j] = -2.0*Pi*exp(-k)*i*hk_grid;
+		Smatrix0[j] = 2.0*Pi*in0*hk_grid;
+		ErrorO[j] = 2.0*Pi*exp(-k)*err*hk_grid;
+		//Odderontilde[j] = -2.0*Pi*kvector[j] *i;
+		//ErrorO[j] = 2.0*Pi*kvector[j] *err;
+		ToddTMD[j] = i * hk_grid * Pi*proton_radius*proton_radius*proton_mass
+			*exp(1.0*k)*Nc / 2.0 / Pi / 2.0 / Pi / ALPHA_S;
+		ToddTMDk4[j] = ToddTMD[j]
+			* exp(4.0*k);
+
+		ToddTMDL[j] = iL * hk_grid * Pi*proton_radius*proton_radius*proton_mass
+			*kL*Nc / 2.0 / Pi / 2.0 / Pi / ALPHA_S;
+		ToddTMDk4L[j] = ToddTMDL[j]
+			* kL* kL* kL* kL;
+	}
+
+
+
+	ostringstream ofilename, ofilename2, ofilename3;
+	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\BK_running_pureodd_logscale_res_FTsin_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
+	ofilename2 << "G:\\hagiyoshi\\Data\\BK_odderon\\BK_running_pureodd_logscale_Oddtilde"
+		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
+	ofilename3 << "G:\\hagiyoshi\\Data\\BK_odderon\\BK_running_pureodd_Lcale_TMD"
+		<< 40.0 << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
+
+	ofstream ofs_res(ofilename.str().c_str());
+	ofstream ofs_res2(ofilename2.str().c_str());
+	ofstream ofs_res3(ofilename3.str().c_str());
+
+	ofs_res << "# r \t Re( S )0 \t Im( S )0 \t Re( S )s1 \t Im( S )s1 \t Re( S )s2 \t Im( S )s2 \t Re( S )s3 \t Im( S )s3 \t "
+		<< "Re( S )c1 \t Im( S )c1 \t Re( S )c2 \t Im( S )c2 \t Re( S )c3\t Im( S )c3 \t Re( S ) Y=0 analytic\t Im( S )s1 Y=0 analytic \t initialC" << initial_C << endl;
+	for (int i = 0; i < NX; i++) {
+
+		ofs_res << scientific << exp(x[i])
+			<< "\t" << sol_BK_comp0[i].real() << "\t" << sol_BK_comp0[i].imag()
+			<< "\t" << sol_BK_comps1[i].real() << "\t" << sol_BK_comps1[i].imag()
+			<< "\t" << sol_BK_comps2[i].real() << "\t" << sol_BK_comps2[i].imag()
+			<< "\t" << sol_BK_comps3[i].real() << "\t" << sol_BK_comps3[i].imag()
+			<< "\t" << sol_BK_compc1[i].real() << "\t" << sol_BK_compc1[i].imag()
+			<< "\t" << sol_BK_compc2[i].real() << "\t" << sol_BK_compc2[i].imag()
+			<< "\t" << sol_BK_compc3[i].real() << "\t" << sol_BK_compc3[i].imag()
+			<< "\t" << 1.0 - exp(-initialQ0 * initialQ0 / 4.0*exp(2.0*x[i])*log(1.0* exp(-x[i]) / QCD_LAMBDA + exp(1.0)))
+			<< "\t" << initial_C * initialQ0* initialQ0*initialQ0 / 8.0*exp(3.0*x[i])
+			*exp(-initialQ0 * initialQ0 / 4.0*exp(2.0*x[i])*log(1.0* exp(-x[i]) / QCD_LAMBDA + exp(1.0)))
+			<< "\n";
+	}
+
+
+	ofs_res2 << "# k \t tilde(O)(k) \t dipole TMDs\t dipole TMDs timesk^4 \t dipole smatrix0 \t tilde(O)(k)/ smatrix0 \t initialC" << initial_C << endl;
+	for (int i = 0; i < NX; i++) {
+
+		ofs_res2 << scientific
+			<< exp(x[i])
+			//<< kvector[i]
+			<< "\t" << Odderontilde[i] << "\t" << ToddTMD[i] << "\t" << ToddTMDk4[i]
+			<< "\t" << Smatrix0[i] << "\t" << Odderontilde[i] / Smatrix0[i]
+			<< "\n";
+	}
+
+	ofs_res3 << "# k  \t dipole TMDs\t dipole TMDs timesk^4 \t initialC" << initial_C << endl;
+	for (int i = 0; i < NX; i++) {
+
+		ofs_res3 << scientific
+			<< 40.0 / NX * i
+			//<< kvector[i]
+			<< "\t" << ToddTMDL[i] << "\t" << ToddTMDk4L[i]
+			<< "\n";
+	}
+
+	double peakpos = 0.0;
+	double zeroposition = 0.0;
+
+	tk::spline TMDsin;
+	TMDsin.set_points(Vectorx, ToddTMD);
+	//for (int m = NX/2; m < NX; m++) {
+
+	//	double pppp = TMDsin(x[m]);
+	//if (TMDsin(x[m]) > TMDsin(x[m-1])){
+	//	peakpos = x[m];
+
+	//}
+	//else { break; }
+
+	//}
+
+
+	double Newfx = Vectorx[3 * NX / 4] + 0.5;
+	for (;;) {
+
+		if (TMDsin.Fst_deriv(Newfx)*TMDsin.Fst_deriv(Newfx) < 1.0e-4) {
+			break;
+		}
+		else {
+			Newfx = Newfx - TMDsin.Fst_deriv(Newfx) / TMDsin.Sec_deriv(Newfx);
+		}
+
+	}
+	//for (int m = NX / 2; m < NX; m++) {
+	//	if (TMDsin(x[m]) > 0.0) {
+	//		double zzzz = TMDsin(x[m]);
+	//		zeroposition = x[m];
+
+	//	}
+	//	else { break; }
+	//}
+
+	double Newx = Newfx + 0.5;
+	for (;;) {
+
+		if (TMDsin(Newx)*TMDsin(Newx) < 1.0e-4) {
+			break;
+		}
+		else {
+			Newx = Newx - TMDsin(Newx) / TMDsin.Fst_deriv(Newx);
+		}
+
+	}
+
+	return std::complex<double>(Newfx, Newx);
+}
+
+double integrated_TMD(vector<complex<double>> &sol_BK) {
+
+	int N = NX;
+	double h = 1.0*LATTICE_SIZE / NX;
+	double h_theta = 2.0*Pi / NPHI;
+	double   xmax = h * NX / 4.0, xmin = -h * NX* 3.0 / 4.0, ymin = 0.0;
+	vector<double>   x(2 * NX*NPHI, 0.0), y(2 * NX*NPHI, 0.0), y_3(NX*NPHI, 0.0);
+	for (int j = 0; j < 2 * NPHI; j++) {
+		for (int i = 0; i < NX; i++)
+		{
+			x[NX*j + i] = xmin + i * h;
+			y[NX*j + i] = ymin + j * h_theta;
+		}
+	}
+	vector<complex<double>>  sol_BK_comp0(NX, 0), sol_BK_comps1(NX, 0);
+	vector<double> Vectorx(NX, 0), Odderonsin(NX, 0), kvector(NX, 0);
+
+#pragma omp parallel for num_threads(6)
+	for (int i = 0; i < NX; i++) {
+
+		for (int n = 0; n < NPHI; n++) {
+			sol_BK_comp0[i] += sol_BK[n*NX + i];
+			sol_BK_comps1[i] += sol_BK[n*NX + i] * sin(y[NX*n + i]);
+
+		}
+
+		sol_BK_comp0[i] *= h_theta / 2.0 / Pi;
+		sol_BK_comps1[i] *= h_theta / 1.0 / Pi;
+
+		kvector[i] = 1.0* KSPACE_SIZE / double(NX)*i;
+
+		Vectorx[i] = xmin + i * h;
+
+		Odderonsin[i] = sol_BK_comps1[i].imag();
+	}
+
+	vector<double> Odderontilde(NX, 0), ErrorO(NX, 0), ToddTMD(NX, 0), ToddTMDk4(NX, 0);
+	vector<double> OdderontildeL(NX, 0), ErrorOL(NX, 0), ToddTMDL(NX, 0), ToddTMDk4L(NX, 0);
+	int lenaw;
+	extern int nfunc;
+	double tiny, aw[8000];
+
+	lenaw = 8000;
+	tiny = 1.0e-307;
+
+	double hk_grid = LATTICE_SIZE / 4.0 / NX;
+
+	tk::spline BKsin;
+	BKsin.set_points(Vectorx, Odderonsin);
+
+	//#pragma omp parallel for num_threads(6)
+	for (int j = 0; j < NX; j++) {
+		double i = 0;
+		double err = 0;
+
+		double k = x[j];
+		double kL = 40.0 / NX * j;
+		double iL = 0;
+		intdeoini(lenaw, tiny, 1.0e-15, aw);
+		nfunc = 0;
+		//intde(std::bind(integrand_odderontilde,placeholders::_1,k,Odderonsin,Vectorx), xmin,xmax, aw, &i, &err);
+		//intde(std::bind(integrand_odderontilde_normal,placeholders::_1, kvector[j],Odderonsin,Vectorx), 0.0,10.0, aw, &i, &err);
+		//intdeo(std::bind(integrand_odderontilde_normal, placeholders::_1, kvector[j], Odderonsin, Vectorx), 0.0, kvector[j], aw, &i, &err);
+		//printf("I_5=int_0^infty sin(x)/x dx\n");
+		//printf(" I_5= %lg\t, err= %lg\t, N= %d\n", i, err, nfunc);
+		for (int m = 0; m < 4 * NX; m++) {
+			double simpson1 = 1.0;
+			if (m == 0 || m == 4 * NX - 1) {
+				simpson1 = 1.0 / 3.0;
+			}
+			else if (m % 2 == 0) {
+				simpson1 = 2.0 / 3.0;
+			}
+			else {
+
+				simpson1 = 4.0 / 3.0;
+			}
+			double lr = xmin + hk_grid * m;
+			double lrL = xmin + hk_grid * m;
+
+			i += simpson1
+				* exp(2.0*lr)
+				*_j1(exp(k + lr))
+				*BKsin(lr);
+
+			iL += simpson1
+				* exp(2.0*lr)
+				*_j1(kL*exp(lr))
+				*BKsin(lr);
+		}
+
+		//Odderontilde[j]=-2.0*Pi*exp(-k)*i;
+		//ErrorO[j]= 2.0*Pi*exp(-k)*err;
+		Odderontilde[j] = -2.0*Pi
+			//*exp(-k)
+			*i*hk_grid;
+		ErrorO[j] = 2.0*Pi*exp(-k)*err*hk_grid;
+		//Odderontilde[j] = -2.0*Pi*kvector[j] *i;
+		//ErrorO[j] = 2.0*Pi*kvector[j] *err;
+		ToddTMD[j] = i * hk_grid * Pi*proton_radius*proton_radius*proton_mass
+			*exp(1.0*k)*Nc / 2.0 / Pi / 2.0 / Pi / ALPHA_S;
+		ToddTMDk4[j] = ToddTMD[j]
+			* exp(4.0*k);
+
+		ToddTMDL[j] = iL * hk_grid * Pi*proton_radius*proton_radius*proton_mass
+			*kL*Nc / 2.0 / Pi / 2.0 / Pi / ALPHA_S;
+		ToddTMDk4L[j] = ToddTMDL[j]
+			* kL* kL* kL* kL;
+	}
+
+
+	tk::spline BKoddt;
+	BKoddt.set_points(Vectorx, Odderontilde);
+	double integrated = 0;
+
+	for (int m = 0; m < 4 * NX; m++) {
+		double simpson1 = 1.0;
+		if (m == 0 || m == 4 * NX - 1) {
+			simpson1 = 1.0 / 3.0;
+		}
+		else if (m % 2 == 0) {
+			simpson1 = 2.0 / 3.0;
+		}
+		else {
+
+			simpson1 = 4.0 / 3.0;
+		}
+		double lr = xmin + hk_grid * m;
+		double lrL = xmin + hk_grid * m;
+
+		integrated += simpson1
+			//* exp(4.0*lr)
+			* exp(3.0*lr)
+			*BKoddt(lr);
+	}
+
+	return integrated * hk_grid;
 }
 
 void running_coupling() {
 	time_t t0 = time(NULL);
-	ostringstream ofilename;
+
+	std::complex<double> TMDPZ;
+	tk::spline BKsol;
+
+	vector<double> Vectorx(NX, 0);
+	double h = 1.0*LATTICE_SIZE / NX;
+	double h_theta = 2.0*Pi / NPHI;
+	double   xmax = h * NX / 4.0, xmin = -h * NX* 3.0 / 4.0, ymin = 0.0;
+	for (int i = 0; i < NX; i++)
+	{
+		Vectorx[i] = xmin + i * h;
+	}
+	double peakps = 0.0;
+
+	ostringstream ofilename, ofilename2;
 #ifdef LOGSCALE
 	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\running\\BK_running_logscale_res_taudep_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_hipre.txt";
+	ofilename2 << "G:\\hagiyoshi\\Data\\BK_odderon\\running\\BK_running_logscale_res_peakrap_zero_size"
 		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_hipre.txt";
 #else
 	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\running\\BK_running_res_taudep_size"
 		<< LATTICE_SIZE << "_grid_" << NX << "_timestep_" << DELTA_T << "_hipre.txt";
 #endif
 	ofstream ofs_res(ofilename.str().c_str());
+	ofstream ofs_res2(ofilename2.str().c_str());
 
 	ofs_res << "# tau \t r \t Re( S ) \t Im( S ) \t initialC " << initial_C << "\t Q0" << initialQ0 << endl;
+	ofs_res2 << "# tau\t peakBK \t peakTMD \t zeroTMD \t initialC " << initial_C << "\t Q0" << initialQ0 << endl;
 
 #ifdef LOGSCALE
 	vector<complex<double>> sol_BK_comp(NX*NPHI, 0);
+	vector<double> sol_BK_imagmax(NX, 0);
 	double h_phi = 2.0*Pi / NPHI;
 	double h_half = 1.0*LATTICE_SIZE / NX;
 #else
@@ -1690,9 +2347,27 @@ void running_coupling() {
 	init_BK_running_log_Ncalculation(sol_BK_comp.data());
 	print_logscale_g_running(sol_BK_comp);
 	//print_logscale_g_running_inicos(sol_BK_comp);
+
 	ofs_res << scientific << tau << "\t" << exp(-NX / 2.0*h_half) << "\t"
 		<< sol_BK_comp[NPHI / 4 * NX + NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + NX / 4].imag() << "\n";
-	FT_expantion_running(sol_BK_comp);
+
+	TMDPZ=FT_expantion_running(sol_BK_comp); 
+
+	for (int m = 0; m < NX; m++) {
+		sol_BK_imagmax[m] = sol_BK_comp[NX*NPHI / 4 + m].imag();
+	}
+
+	BKsol.set_points(Vectorx, sol_BK_imagmax);
+	for (int m = NX / 2; m < NX; m++) {
+		if (BKsol(Vectorx[m]) > BKsol(Vectorx[m - 1])) {
+			peakps = Vectorx[m];
+		}
+		else { break; }
+	}
+
+	ofs_res2 << scientific << tau << "\t" << exp(peakps) << "\t"
+		<< exp (TMDPZ.real()) << "\t" << exp(TMDPZ.imag() )<< "\n";
+
 #else
 	init_BK(sol_BK_comp.data());
 	print_g(sol_BK_comp);
@@ -1718,7 +2393,22 @@ void running_coupling() {
 		ofs_res << scientific << tau << "\t" << exp(-NX / 2.0*h_half) << "\t"
 			<< sol_BK_comp[NPHI / 4 * NX + NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + NX / 4].imag() << "\n";
 
-		FT_expantion_running(sol_BK_comp);
+		TMDPZ = FT_expantion_running(sol_BK_comp);
+
+		for (int m = 0; m < NX; m++) {
+			sol_BK_imagmax[m] = sol_BK_comp[NX*NPHI / 4 + m].imag();
+		}
+
+		BKsol.set_points(Vectorx, sol_BK_imagmax);
+		for (int m = NX / 2; m < NX; m++) {
+			if (BKsol(Vectorx[m]) > BKsol(Vectorx[m - 1])) {
+				peakps = Vectorx[m];
+			}
+			else { break; }
+		}
+
+		ofs_res2 << scientific << tau << "\t" << exp(peakps) << "\t"
+			<< exp(TMDPZ.real()) << "\t" << exp(TMDPZ.imag()) << "\n";
 		cout << "time \t" << tau << "\n";
 #else
 		print_g(sol_BK_comp);
@@ -1734,7 +2424,23 @@ void running_coupling() {
 	ofs_res << scientific << tau << "\t" << exp(-NX / 2.0*h_half) << "\t"
 		<< sol_BK_comp[NPHI / 4 * NX + NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + NX / 4].imag() << "\n";
 
-	FT_expantion_running(sol_BK_comp);
+	TMDPZ = FT_expantion_running(sol_BK_comp);
+
+	for (int m = 0; m < NX; m++) {
+		sol_BK_imagmax[m] = sol_BK_comp[NX*NPHI / 4 + m].imag();
+	}
+
+	BKsol.set_points(Vectorx, sol_BK_imagmax);
+	for (int m = NX / 2; m < NX; m++) {
+		if (BKsol(Vectorx[m]) > BKsol(Vectorx[m - 1])) {
+			peakps = Vectorx[m];
+		}
+		else { break; }
+	}
+
+	ofs_res2 << scientific << tau << "\t" << exp(peakps) << "\t"
+		<< exp(TMDPZ.real()) << "\t" << exp(TMDPZ.imag()) << "\n";
+
 	cout << "time \t" << tau << "\n";
 #else
 	print_g(sol_BK_comp);
@@ -1748,9 +2454,206 @@ void running_coupling() {
 	cout << endl;
 }
 
+void running_coupling_pureodd() {
+	time_t t0 = time(NULL);
+
+	std::complex<double> TMDPZ;
+	tk::spline BKsol;
+
+	vector<double> Vectorx(NX, 0);
+	double h = 1.0*LATTICE_SIZE / NX;
+	double h_theta = 2.0*Pi / NPHI;
+	double   xmax = h * NX / 4.0, xmin = -h * NX* 3.0 / 4.0, ymin = 0.0;
+	for (int i = 0; i < NX; i++)
+	{
+		Vectorx[i] = xmin + i * h;
+	}
+	double peakps = 0.0;
+
+	ostringstream ofilename, ofilename2;
+#ifdef LOGSCALE
+	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\running\\BK_running_pureodd_logscale_res_taudep_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_hipre.txt";
+	ofilename2 << "G:\\hagiyoshi\\Data\\BK_odderon\\running\\BK_running_pureodd_logscale_res_peakrap_zero_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_hipre.txt";
+#else
+	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\running\\BK_running_res_taudep_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_timestep_" << DELTA_T << "_hipre.txt";
+#endif
+	ofstream ofs_res(ofilename.str().c_str());
+	ofstream ofs_res2(ofilename2.str().c_str());
+
+	ofs_res << "# tau \t r \t Re( S ) \t Im( S ) \t initialC " << initial_C << "\t Q0" << initialQ0 << endl;
+	ofs_res2 << "# tau\t peakBK \t peakTMD \t zeroTMD \t initialC " << initial_C << "\t Q0" << initialQ0 << endl;
+
+#ifdef LOGSCALE
+	vector<complex<double>> sol_BK_comp(NX*NPHI, 0);
+	vector<double> sol_BK_imagmax(NX, 0);
+	double h_phi = 2.0*Pi / NPHI;
+	double h_half = 1.0*LATTICE_SIZE / NX;
+#else
+	double h_half = 1.0*LATTICE_SIZE / NX;
+	vector<complex<double>> sol_BK_comp(NX*NX, 0);
+#endif
+
+
+	const double EPS = 1e-12;
+
+	double next_tau = 0;
+
+#ifdef LOGSCALE
+	//init_BK_log(sol_BK_comp.data());
+	init_BK_running_log_Ncalculation_pureodd(sol_BK_comp.data());
+	print_logscale_g_running_pureodd(sol_BK_comp);
+	//print_logscale_g_running_inicos(sol_BK_comp);
+
+	ofs_res << scientific << tau << "\t" << exp(-NX / 2.0*h_half) << "\t"
+		<< sol_BK_comp[NPHI / 4 * NX + NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + NX / 4].imag() << "\n";
+
+	//TMDPZ = FT_expantion_running_pureodd(sol_BK_comp);
+
+	for (int m = 0; m < NX; m++) {
+		sol_BK_imagmax[m] = sol_BK_comp[NX*NPHI / 4 + m].imag();
+	}
+
+	BKsol.set_points(Vectorx, sol_BK_imagmax);
+	for (int m = NX / 2; m < NX; m++) {
+		if (BKsol(Vectorx[m]) > BKsol(Vectorx[m - 1])) {
+			peakps = Vectorx[m];
+		}
+		else { break; }
+	}
+
+	ofs_res2 << scientific << tau << "\t" << exp(peakps) << "\t"
+		<< exp(TMDPZ.real()) << "\t" << exp(TMDPZ.imag()) << "\n";
+
+#else
+	init_BK(sol_BK_comp.data());
+	print_g(sol_BK_comp);
+#endif
+
+	//evaluate the number of time step
+	for (;;) {
+		int reunit_count = 0;
+		if (tau >= END_T - EPS) {
+			break;
+		}
+		next_tau = min(next_tau + OUTPUT_DELTA_T, END_T);
+		while (tau < next_tau - EPS) {
+#ifdef LOGSCALE
+			one_step_logscale_complex(sol_BK_comp, min(DELTA_T, next_tau - tau));
+#else
+			one_step_complex(sol_BK_comp, min(DELTA_T, next_tau - tau));
+#endif
+		}
+#ifdef LOGSCALE
+		print_logscale_g_running_pureodd(sol_BK_comp);
+		//print_logscale_g_running_inicos(sol_BK_comp);
+		ofs_res << scientific << tau << "\t" << exp(-NX / 2.0*h_half) << "\t"
+			<< sol_BK_comp[NPHI / 4 * NX + NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + NX / 4].imag() << "\n";
+
+		//TMDPZ = FT_expantion_running_pureodd(sol_BK_comp);
+
+		for (int m = 0; m < NX; m++) {
+			sol_BK_imagmax[m] = sol_BK_comp[NX*NPHI / 4 + m].imag();
+		}
+
+		BKsol.set_points(Vectorx, sol_BK_imagmax);
+		for (int m = NX / 2; m < NX; m++) {
+			if (BKsol(Vectorx[m]) > BKsol(Vectorx[m - 1])) {
+				peakps = Vectorx[m];
+			}
+			else { break; }
+		}
+
+		ofs_res2 << scientific << tau << "\t" << exp(peakps) << "\t"
+			<< exp(TMDPZ.real()) << "\t" << exp(TMDPZ.imag()) << "\n";
+		cout << "time \t" << tau << "\n";
+#else
+		print_g(sol_BK_comp);
+		ofs_res << scientific << tau << "\t" << sqrt(2.0)*h_half*(double)NX / 4.0 << "\t"
+			<< sol_BK_comp[3 * NX / 4 * NX + 3 * NX / 4].real() << "\t" << sol_BK_comp[3 * NX / 4 * NX + 3 * NX / 4].imag() << "\n";
+		cout << "time \t" << tau << "\n";
+#endif
+	}
+
+#ifdef LOGSCALE
+	print_logscale_g_running_pureodd(sol_BK_comp);
+	//print_logscale_g_running_inicos(sol_BK_comp);
+	ofs_res << scientific << tau << "\t" << exp(-NX / 2.0*h_half) << "\t"
+		<< sol_BK_comp[NPHI / 4 * NX + NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + NX / 4].imag() << "\n";
+
+	//TMDPZ = FT_expantion_running_pureodd(sol_BK_comp);
+
+	for (int m = 0; m < NX; m++) {
+		sol_BK_imagmax[m] = sol_BK_comp[NX*NPHI / 4 + m].imag();
+	}
+
+	BKsol.set_points(Vectorx, sol_BK_imagmax);
+	for (int m = NX / 2; m < NX; m++) {
+		if (BKsol(Vectorx[m]) > BKsol(Vectorx[m - 1])) {
+			peakps = Vectorx[m];
+		}
+		else { break; }
+	}
+
+	ofs_res2 << scientific << tau << "\t" << exp(peakps) << "\t"
+		<< exp(TMDPZ.real()) << "\t" << exp(TMDPZ.imag()) << "\n";
+
+	cout << "time \t" << tau << "\n";
+#else
+	print_g(sol_BK_comp);
+	ofs_res << scientific << tau << "\t" << sqrt(2.0)*h_half*(double)NX / 4.0 << "\t"
+		<< sol_BK_comp[3 * NX / 4 * NX + 3 * NX / 4].real() << "\t" << sol_BK_comp[3 * NX / 4 * NX + 3 * NX / 4].imag() << "\n";
+	cout << "time \t" << tau << "\n";
+#endif
+
+	time_t t1 = time(NULL);
+	cout << t0 - t1 << endl;
+	cout << endl;
+}
+
+void Load_and_TMD() {
+
+	std::complex<double> TMDPZ;
+
+	vector<complex<double>> sol_BK_comp(NX*NPHI, 0);
+
+	ostringstream ofilename, ofilename2, ofilename3;
+	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\BK_running_logscale_res_Ok2_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_hipre.txt";
+
+	ofstream ofs_res(ofilename.str().c_str());
+
+	ofs_res << "# tau \t int dk tildeO*k^3 \t initialC " << initial_C << "\t Q0" << initialQ0 << endl;
+
+
+	for (int i = 0; i < END_T / OUTPUT_DELTA_T+1; i++) {
+
+
+		Load_BK_sol(sol_BK_comp, tau);
+
+		TMDPZ = FT_expantion_running(sol_BK_comp);
+
+		cout << "rapidity \t" << tau << endl;
+		ofs_res << tau << "\t" << integrated_TMD(sol_BK_comp)<<"\n";
+		tau += OUTPUT_DELTA_T;
+	}
+
+}
+
 int main() {
 #ifdef RUNNING
+#ifdef PUREODD
+
+	running_coupling_pureodd();
+#else
 	running_coupling();
+	//Load_and_TMD();
+
+#endif // PUREODD
+
+  	 
 #else
 	constant_coupling();
 #endif

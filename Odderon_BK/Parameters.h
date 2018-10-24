@@ -1,5 +1,7 @@
 #define RUNNING
 
+//#define PUREODD
+
 
 // pi
 #define Pi 3.14159265358979323846264338327950288419716939937508
@@ -7,11 +9,11 @@
 #define	  	Nc		  	3
 
 
-#define NX	256
+#define NX	128
 
 #define NPHI 32
 
-#define LATTICE_SIZE	 16.0
+#define LATTICE_SIZE	 24.0
 
 
 #define KSPACE_SIZE	 10.0
