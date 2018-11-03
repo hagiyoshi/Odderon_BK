@@ -196,6 +196,103 @@ __global__ void Integration_BK_direct(cuDoubleComplex* integrated, cuDoubleCompl
 }
 
 
+__global__ void Integration_BK_direct_pureodd_Ncalculation(cuDoubleComplex* integrated, cuDoubleComplex* S_matrix,
+	double* x_1, double* y_1, double h, int N_ini, int N_las, int N) {
+
+	int i = threadIdx.x + blockIdx.x*blockDim.x;
+	int j = threadIdx.y + blockIdx.y*blockDim.y;
+	int index = j * N + i;
+	if (i < N && j < N) {
+		integrated[index] = make_cuDoubleComplex(0.0, 0.0);
+		//sit the index which is center of the gaussian.
+
+		cuDoubleComplex complex_zero = make_cuDoubleComplex(0.0, 0.0);
+		//If x=N*j+i, then -x=N*(N-j)+N-i(when the origin is x= N*N/2 + N/2).
+		for (int m = N_ini; m < N_las; m++) {
+			for (int n = 0; n < N; n++) {
+				double simpson1 = 1.0;
+				double simpson2 = 1.0;
+				int diffinitm = m - N_ini;
+				if (m == N_ini || m == N_las - 1) {
+					simpson1 = 1.0 / 3.0;
+				}
+				else if (diffinitm % 2 == 0) {
+					simpson1 = 2.0 / 3.0;
+				}
+				else {
+
+					simpson1 = 4.0 / 3.0;
+				}
+
+
+				if (n == 0 || n == N - 1) {
+					simpson2 = 1.0 / 3.0;
+				}
+				else if (n % 2 == 0) {
+					simpson2 = 2.0 / 3.0;
+				}
+				else {
+
+					simpson2 = 4.0 / 3.0;
+				}
+
+				cuDoubleComplex trV_V = make_cuDoubleComplex(0.0, 0.0);
+				//if r-z is out of the region then we take the S(r-z) =0.
+				if ((j - m + N / 2) < 0 || (j - m + N / 2) > N - 1 || (i - n + N / 2) < 0 || (i - n + N / 2) > N - 1) {
+					//trV= - N(r)
+					trV_V = cuCsub(trV_V,
+						S_matrix[j * N + i]);
+					//trV=- N(r)+N(z)
+					trV_V = cuCadd(trV_V,
+						S_matrix[m * N + n]);
+					//trV= - N(r)+N(z)+N(r-z)
+					trV_V = cuCadd(trV_V,
+						S_matrix[(j - m + N / 2) * N + i - n + N / 2]);
+				}
+				else {
+					//trV=-N(r-z)
+					trV_V = cuCsub(trV_V,
+						S_matrix[(j - m + N / 2) * N + i - n + N / 2]);
+					//trV=-N(r-z)*N(z)
+					trV_V = cuCmul(trV_V,
+						(S_matrix[m * N + n]));
+					//trV=-N(r-z)*N(z) - N(r)
+					trV_V = cuCsub(trV_V,
+						S_matrix[j * N + i]);
+					//trV=-N(r-z)*N(z) - N(r) + N(z)
+					trV_V = cuCadd(trV_V,
+						S_matrix[m * N + n]);
+					//trV=-N(r-z)*N(z) - N(r) + N(z) + N(r-z)
+					trV_V = cuCadd(trV_V,
+						S_matrix[(j - m + N / 2) * N + i - n + N / 2]);
+				}
+
+				cuDoubleComplex coeff = make_cuDoubleComplex(
+					simpson1*simpson2
+					*(x_1[j*N + i] * x_1[j*N + i] + y_1[j*N + i] * y_1[j*N + i])
+					/ ((x_1[m*N + n] - x_1[j*N + i])*(x_1[m*N + n] - x_1[j*N + i]) + (y_1[m*N + n] - y_1[j*N + i])*(y_1[m*N + n] - y_1[j*N + i]))
+					/ (x_1[m*N + n] * x_1[m*N + n] + y_1[m*N + n] * y_1[m*N + n]),
+					0.0
+				);
+
+				if (((x_1[m*N + n] - x_1[j*N + i])*(x_1[m*N + n] - x_1[j*N + i])
+					+ (y_1[m*N + n] - y_1[j*N + i])*(y_1[m*N + n] - y_1[j*N + i])) < 1.0e-12
+					|| (x_1[m*N + n] * x_1[m*N + n] + y_1[m*N + n] * y_1[m*N + n]) < 1.0e-12) {
+					coeff = make_cuDoubleComplex(0.0, 0.0);
+				}
+
+				integrated[index] = cuCadd(integrated[index], cuCmul(coeff, trV_V));
+
+			}
+		}
+
+		cuDoubleComplex coeff2 = make_cuDoubleComplex(h*h*ALPHA_S_BAR / 2.0 / Pi, 0.0);
+
+		integrated[index] = cuCmul(integrated[index], coeff2);
+	}
+}
+
+
 __global__ void Integration_BK_logscale_direct(cuDoubleComplex* integrated, cuDoubleComplex* S_matrix,
 	double* x_1, double* y_1, double h, int N) {
 
@@ -827,7 +924,7 @@ __global__ void Integration_BK_running_pureodd_logscale_direct_Ncalculation(cuDo
 		integrated[index] = make_cuDoubleComplex(0.0, 0.0);
 		//sit the index which is center of the gaussian.
 
-		double   xmax = h * NX / 4.0, xmin = -h * NX* 3.0 / 4.0, ymin = 0.0;
+		double   xmax = h * NX / 4.0, xmin = XMIN, ymin = 0.0;
 		double h_theta = 2.0*Pi / NPHI;
 		cuDoubleComplex complex_zero = make_cuDoubleComplex(0.0, 0.0);
 		//If x=N*j+i, then -x=N*(N-j)+N-i(when the origin is x= N*N/2 + N/2).
@@ -838,14 +935,14 @@ __global__ void Integration_BK_running_pureodd_logscale_direct_Ncalculation(cuDo
 				int diffinitm = m - 0;
 
 				if (m == 0 || m == NPHI - 1) {
-					simpson1 = 1.0 / 3.0;
+				//	simpson1 = 1.0 / 3.0;
 				}
 				else if (m % 2 == 0) {
-					simpson1 = 2.0 / 3.0;
+				//	simpson1 = 2.0 / 3.0;
 				}
 				else {
 
-					simpson1 = 4.0 / 3.0;
+				//	simpson1 = 4.0 / 3.0;
 				}
 
 				if (n == 0 || n == N - 1) {
@@ -1003,7 +1100,12 @@ void Integration_in_BK_equation(std::complex<double>* Smatrix_in, std::complex<d
 	dim3 dimGrid(int((N - 0.5) / BSZ) + 1, int((N - 0.5) / BSZ) + 1);
 	dim3 dimBlock(BSZ, BSZ);
 	
+#ifdef PUREODD
+	Integration_BK_direct_pureodd_Ncalculation <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, 0, N, N);
+#else
 	Integration_BK_direct <<<dimGrid, dimBlock >>> (Integrated_d, S_matrix_d, x_d, y_d, h, 0, N, N);
+
+#endif
 
 	cudaMemcpy(Integrated_out, Integrated_d, sizeof(std::complex<double>)*N*N, cudaMemcpyDeviceToHost);
 
@@ -1023,7 +1125,7 @@ void Integration_in_logscale_BK_equation(std::complex<double>* Smatrix_in, std::
 	int N = NX;
 	double h = 1.0*LATTICE_SIZE / NX;
 	double h_theta = 2.0*Pi / NPHI;
-	double   xmax = h * NX / 4.0, xmin = -h * NX* 3.0 / 4.0, ymin = 0.0;
+	double   xmax = h * NX / 4.0, xmin = XMIN, ymin = 0.0;
 	double   *x = new double[N*NPHI], *y = new double[N*NPHI];
 	for (int j = 0; j < NPHI; j++) {
 		for (int i = 0; i < NX; i++)

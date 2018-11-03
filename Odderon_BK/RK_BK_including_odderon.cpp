@@ -38,8 +38,6 @@ using namespace std;
 
 #define LARGE_Nc
 
-#define LOGSCALE
-
 //for DE formula
 int nfunc;
 
@@ -64,8 +62,8 @@ const double IMPACTP_B = 1.0;
 * The evolution step size.
 */
 #define DELTA_T         0.1
-#define OUTPUT_DELTA_T  0.1
-#define END_T           0.1
+#define OUTPUT_DELTA_T  0.5
+#define END_T           10.0
 
 
 /**
@@ -98,6 +96,30 @@ void init_BK(std::complex<double>* Smatrix_in){
 				exp(-(x[NX*j + i] * x[NX*j + i] + y[NX*j + i] * y[NX*j + i])*initialQ0*initialQ0 / 4.0)
 				*(x[NX*j + i] * x[NX*j + i] + y[NX*j + i] * y[NX*j + i])*y[NX*j + i]
 				*initial_C
+				);
+		}
+	}
+
+
+}
+
+
+void init_BK_pureodd(std::complex<double>* Smatrix_in) {
+	//tau = 0;
+	int N = NX;
+	double h = 1.0*LATTICE_SIZE / NX;
+	double   xmax = h * NX / 1.0, xmin = -h * NX / 2.0, ymin = -h * NX / 2.0;
+	double   *x = new double[N*N], *y = new double[N*N];
+	for (int j = 0; j < NX; j++) {
+		for (int i = 0; i < NX; i++)
+		{
+			x[NX*j + i] = xmin + i * h;
+			y[NX*j + i] = ymin + j * h;
+			Smatrix_in[NX*j + i] = complex<double>(
+				0.0,
+				exp(-(x[NX*j + i] * x[NX*j + i] + y[NX*j + i] * y[NX*j + i])*initialQ0*initialQ0 / 4.0)
+				*(x[NX*j + i] * x[NX*j + i] + y[NX*j + i] * y[NX*j + i])*y[NX*j + i]
+				* initial_C
 				);
 		}
 	}
@@ -212,7 +234,7 @@ void init_BK_running_log_Ncalculation_pureodd(std::complex<double>* Smatrix_in) 
 	int N = NX;
 	double h = 1.0*LATTICE_SIZE / NX;
 	double h_theta = 2.0*Pi / NPHI;
-	double   xmax = h * NX / 4.0, xmin = -h * NX *3.0 / 4.0, ymin = 0.0;
+	double   xmax = h * NX / 4.0, xmin = XMIN, ymin = 0.0;
 	double   *x = new double[N*N], *y = new double[N*N];
 	for (int j = 0; j < NPHI; j++) {
 		double thetakannsuu = -0.0;
@@ -233,6 +255,18 @@ void init_BK_running_log_Ncalculation_pureodd(std::complex<double>* Smatrix_in) 
 					)
 				* initial_C
 				);
+
+			//Smatrix_in[NX*j + i] = complex<double>(
+			//	0.0,
+			//	(1.0 - exp(-exp(2.0*x[NX*j + i])))
+			//	*(
+					//thetakannsuu
+					//cos(1.0*y[NX*j + i]) 
+			//		sin(1.0*y[NX*j + i])
+			//		)
+			//	* 1.0e-5
+			//	);
+
 		}
 	}
 
@@ -1027,6 +1061,58 @@ void print_g(vector<complex<double>> &sol_BK) {
 /**
 * Prints g_Y.
 */
+void print_g_pureodd(vector<complex<double>> &sol_BK) {
+	int N = NX;
+	double h = 1.0*LATTICE_SIZE / NX;
+	double   xmax = h * NX / 1.0, xmin = -h * NX / 2.0, ymin = -h * NX / 2.0;
+	double   *x = new double[N*N], *y = new double[N*N];
+	for (int j = 0; j < NX; j++) {
+		for (int i = 0; i < NX; i++)
+		{
+			x[NX*j + i] = xmin + i * h;
+			y[NX*j + i] = ymin + j * h;
+		}
+	}
+
+	ostringstream ofilename, ofilename2;
+	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\solutions\\BK_pureodd_res_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
+	ofstream ofs_res(ofilename.str().c_str());
+	ofilename2 << "G:\\hagiyoshi\\Data\\BK_odderon\\solutions\\BK_pureodd_res_distance_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
+	ofstream ofs_res2(ofilename2.str().c_str());
+
+	ofs_res << "# x \t y \t Re( S ) \t Im( S )" << "\t Q0" << initialQ0 << endl;
+	ofs_res2 << "# r \t Re( S ) \t Im( S )" << "\t Q0" << initialQ0 << endl;
+
+	for (int i = 0; i < NX; i++) {
+		for (int j = 0; j < NX; j++) {
+			ofs_res << scientific << x[NX*j + i] << "\t" << y[NX*j + i] << "\t"
+				<< sol_BK[NX*j + i].real() << "\t" << sol_BK[NX*j + i].imag() << endl;
+		}
+
+		ofs_res << endl;
+	}
+
+	for (int i = N / 2; i < N; i++) {
+
+		ofs_res2 << scientific 
+			//<< sqrt(x[NX*i + i] * x[NX*i + i] + y[NX*i + i] * y[NX*i + i])
+			<<  y[NX*i+ N / 2]
+			<< "\t"
+			//<< sol_BK[NX*i + i].real() << "\t" << sol_BK[NX*i + i].imag()
+			<< sol_BK[NX*i + N / 2].real() << "\t" << sol_BK[NX*i + N / 2].imag()
+			<< endl;
+	}
+
+	delete[](x);
+	delete[](y);
+}
+
+
+/**
+* Prints g_Y.
+*/
 void print_logscale_g(vector<complex<double>> &sol_BK) {
 	int N = NX;
 	double h = 1.0*LATTICE_SIZE / NX;
@@ -1360,6 +1446,98 @@ void constant_coupling(){
 }
 
 
+void constant_coupling_pureodd() {
+	time_t t0 = time(NULL);
+	ostringstream ofilename;
+#ifdef LOGSCALE
+	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\solutions\\BK_pureodd_logscale_res_taudep_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_hipre.txt";
+#else
+	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\solutions\\BK_pureodd_res_taudep_size"
+		<< LATTICE_SIZE << "_grid_" << NX << "_timestep_" << DELTA_T << "_hipre.txt";
+#endif
+	ofstream ofs_res(ofilename.str().c_str());
+
+	ofs_res << "# tau \t r \t Re( S ) \t Im( S ) \t initialC " << initial_C << "\t Q0" << initialQ0 << endl;
+
+#ifdef LOGSCALE
+	vector<complex<double>> sol_BK_comp(NX*NPHI, 0);
+	double h_phi = 2.0*Pi / NPHI;
+	double h_half = 1.0*LATTICE_SIZE / NX;
+#else
+	double h_half = 1.0*LATTICE_SIZE / NX;
+	vector<complex<double>> sol_BK_comp(NX*NX, 0);
+#endif
+
+
+	const double EPS = 1e-12;
+
+	double next_tau = 0;
+
+#ifdef LOGSCALE
+	//init_BK_log(sol_BK_comp.data());
+	init_BK_log_Ncalculation(sol_BK_comp.data());
+	print_logscale_g(sol_BK_comp);
+	//print_logscale_g_inicos(sol_BK_comp);
+	ofs_res << scientific << tau << "\t" << exp(-NX / 2.0*h_half) << "\t"
+		<< sol_BK_comp[NPHI / 4 * NX + NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + NX / 4].imag() << "\n";
+	FT_expantion(sol_BK_comp);
+#else
+	init_BK_pureodd(sol_BK_comp.data());
+	print_g_pureodd(sol_BK_comp);
+#endif
+
+	//evaluate the number of time step
+	for (;;) {
+		int reunit_count = 0;
+		if (tau >= END_T - EPS) {
+			break;
+		}
+		next_tau = min(next_tau + OUTPUT_DELTA_T, END_T);
+		while (tau < next_tau - EPS) {
+#ifdef LOGSCALE
+			one_step_logscale_complex(sol_BK_comp, min(DELTA_T, next_tau - tau));
+#else
+			one_step_complex(sol_BK_comp, min(DELTA_T, next_tau - tau));
+#endif
+		}
+#ifdef LOGSCALE
+		print_logscale_g(sol_BK_comp);
+		//print_logscale_g_inicos(sol_BK_comp);
+		ofs_res << scientific << tau << "\t" << exp(-NX / 2.0*h_half) << "\t"
+			<< sol_BK_comp[NPHI / 4 * NX + NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + NX / 4].imag() << "\n";
+
+		FT_expantion(sol_BK_comp);
+		cout << "time \t" << tau << "\n";
+#else
+		print_g_pureodd(sol_BK_comp);
+		ofs_res << scientific << tau << "\t" << sqrt(2.0)*h_half*(double)NX / 4.0 << "\t"
+			<< sol_BK_comp[3 * NX / 4 * NX + 3 * NX / 4].real() << "\t" << sol_BK_comp[3 * NX / 4 * NX + 3 * NX / 4].imag() << "\n";
+		cout << "time \t" << tau << "\n";
+#endif
+	}
+
+#ifdef LOGSCALE
+	print_logscale_g(sol_BK_comp);
+	//print_logscale_g_inicos(sol_BK_comp);
+	ofs_res << scientific << tau << "\t" << exp(-NX / 2.0*h_half) << "\t"
+		<< sol_BK_comp[NPHI / 4 * NX + NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + NX / 4].imag() << "\n";
+
+	FT_expantion(sol_BK_comp);
+	cout << "time \t" << tau << "\n";
+#else
+	print_g_pureodd(sol_BK_comp);
+	ofs_res << scientific << tau << "\t" << sqrt(2.0)*h_half*(double)NX / 4.0 << "\t"
+		<< sol_BK_comp[3 * NX / 4 * NX + 3 * NX / 4].real() << "\t" << sol_BK_comp[3 * NX / 4 * NX + 3 * NX / 4].imag() << "\n";
+	cout << "time \t" << tau << "\n";
+#endif
+
+	time_t t1 = time(NULL);
+	cout << t0 - t1 << endl;
+	cout << endl;
+}
+
+
 /**
 * Prints g_Y.
 */
@@ -1465,7 +1643,7 @@ void print_logscale_g_running_pureodd(vector<complex<double>> &sol_BK) {
 	int N = NX;
 	double h = 1.0*LATTICE_SIZE / NX;
 	double h_theta = 2.0*Pi / NPHI;
-	double   xmax = h * NX / 4.0, xmin = -h * NX*3.0 / 4.0, ymin = 0.0;
+	double   xmax = h * NX / 4.0, xmin = XMIN, ymin = 0.0;
 	double   *x = new double[N*NPHI], *y = new double[N*NPHI];
 	for (int j = 0; j < NPHI; j++) {
 		for (int i = 0; i < NX; i++)
@@ -2463,7 +2641,7 @@ void running_coupling_pureodd() {
 	vector<double> Vectorx(NX, 0);
 	double h = 1.0*LATTICE_SIZE / NX;
 	double h_theta = 2.0*Pi / NPHI;
-	double   xmax = h * NX / 4.0, xmin = -h * NX* 3.0 / 4.0, ymin = 0.0;
+	double   xmax = h * NX / 4.0, xmin = XMIN, ymin = 0.0;
 	for (int i = 0; i < NX; i++)
 	{
 		Vectorx[i] = xmin + i * h;
@@ -2655,7 +2833,13 @@ int main() {
 
   	 
 #else
+
+#ifdef PUREODD
+
+	constant_coupling_pureodd();
+#else
 	constant_coupling();
+#endif
 #endif
 
 }

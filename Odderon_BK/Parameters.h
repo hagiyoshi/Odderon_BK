@@ -1,6 +1,9 @@
-#define RUNNING
+//#define RUNNING
 
-//#define PUREODD
+#define PUREODD
+
+
+//#define LOGSCALE
 
 
 // pi
@@ -13,7 +16,9 @@
 
 #define NPHI 32
 
-#define LATTICE_SIZE	 24.0
+#define LATTICE_SIZE	 16.0
+
+#define XMIN	-8.0
 
 
 #define KSPACE_SIZE	 10.0
