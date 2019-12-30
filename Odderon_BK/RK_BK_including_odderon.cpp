@@ -1,4 +1,5 @@
 // This program is intended to solve the BK equation
+#include <boost/math/special_functions/bessel.hpp>
 #include <ctime>
 #include <cstring>
 #include <cstdlib>
@@ -63,6 +64,8 @@ const double Radius_Nuc = 1.0;
 */
 const double IMPACTP_B = 1.0;
 
+const int N_gridz = 100;
+
 /**
 * The evolution step size.
 */
@@ -79,6 +82,10 @@ double inter_tau = 0.5;
 
 const double initialQ0 = 1.0;
 const double initial_C = 1.0/3.0;
+
+const double MassProton = 1.0;
+const double Massquark = 0.1;
+const double Massdiquark = 0.1;
 
 
 void init_BK(std::complex<double>* Smatrix_in){
@@ -152,9 +159,108 @@ void init_BK_log_Ncalculation(std::complex<double>* Smatrix_in) {
 		}
 	}
 
-
+	delete x;
+	delete y;
 }
 
+
+double psi_psidag_ovcs2_forintegration(double z,double r, int s1, int s2) {
+	double Masstilde = (1.0 - z)*Massquark + z * Massdiquark + z * (1.0 - z)*MassProton;
+
+	if (s1 == s2) {
+		double realpart =  (
+			(MassProton*z + Massquark)*(MassProton*z + Massquark)*BOOST_MATH_BESSEL_K0_HPP(Masstilde*r)
+											*BOOST_MATH_BESSEL_K0_HPP(Masstilde*r)
+			+Masstilde*Masstilde*BOOST_MATH_BESSEL_K1_HPP(Masstilde*r)
+											*BOOST_MATH_BESSEL_K1_HPP(Masstilde*r)
+			);
+
+		if (r < 1.0e-15) {
+			return  0.0;
+		}
+		else {
+			return realpart;
+		}
+	}
+	else {
+		double realpart =  (
+			(MassProton*z + Massquark)*Masstilde *BOOST_MATH_BESSEL_K0_HPP(Masstilde*r)
+			*BOOST_MATH_BESSEL_K1_HPP(Masstilde*r)
+			);
+
+
+		if (r < 1.0e-15) {
+			return 0.0;
+		}
+		else {
+			return realpart;
+		}
+	}
+}
+
+double integration_r_z_PP(std::vector<double> &sol_BK_realc0, std::vector<double> &sol_BK_realc1) {
+
+	double Sigma_0 = 0;
+	double Sigma_1 = 0;
+	double rhoparameter = 0;
+
+	double grid = 1.0 / N_gridz;
+	int N = NX;
+	double h = 1.0*LATTICE_SIZE / NX;
+	double h_theta = 2.0*Pi / NPHI;
+	double   xmax = h * NX / 4.0, xmin = -h * NX *3.0 / 4.0, ymin = 0.0;
+	double   *x = new double[N*N], *y = new double[N*N];
+
+	//double bessel = boost::math::cyl_bessel_i(0, 2.0 / Gauss_param / Gauss_param*10.0*10.0);
+
+
+	for (int i = 0; i < NX; i++)
+	{
+		for (int j = 0; j <= N_gridz; j++)
+		{
+			double simpson = 1.0;
+
+			if (i == 0 || i == NX) {
+				simpson *= 1.0 / 3.0;  // Simpson rule.
+			}
+			else if (i % 2 == 0) {
+				simpson *= 2.0 / 3.0;
+			}
+			else {
+				simpson *= 4.0 / 3.0;
+			}
+
+			double simpson2 = 1.0;
+
+			if (j == 0 || j == N_gridz) {
+				simpson2 *= 1.0 / 3.0;  // Simpson rule.
+			}
+			else if (j % 2 == 0) {
+				simpson2 *= 2.0 / 3.0;
+			}
+			else {
+				simpson2 *= 4.0 / 3.0;
+			}
+
+			double z = j * grid;
+			double x = xmin + i * h;
+
+			Sigma_0 += h * simpson*simpson2 *(1.0 - z)*exp(2.0*x)* psi_psidag_ovcs2_forintegration(z, exp(x), 1, 1)
+				*sol_BK_realc0[i];
+
+
+			Sigma_1 += h * simpson*simpson2  *(1.0 - z)*exp(2.0*x)* psi_psidag_ovcs2_forintegration(z, exp(x), 1, -1)
+				*sol_BK_realc1[i];
+
+		}
+	}
+
+
+	rhoparameter = abs(Sigma_1) / abs(Sigma_0)/sqrt(2.0);
+
+	return rhoparameter;
+
+}
 
 //input S_matrix NX*NPHI, x_1 NX, p_1 PHI;
 std::complex<double> linear_interpolation_Smatrix_cpp(std::complex<double>* S_matrix,
@@ -431,7 +537,7 @@ void Integration_BK_logscale_direct_cpp(std::complex<double>* integrated, std::c
 void Integration_BK_logscale_direct_Ncalculation_cpp(std::complex<double>* integrated, std::complex<double>* S_matrix,
 	double* x_1, double* y_1, double h, int N) {
 
-#pragma omp parallel for num_threads(6)
+#pragma omp parallel for num_threads(2)
 	for (int i = 0; i < N; i++) {
 		for (int j = 0; j < NPHI; j++) {
 			int index = j * N + i;
@@ -610,7 +716,7 @@ void Integration_in_logscale_BK_equation_cpp(std::complex<double>* Smatrix_in, s
 
 
 
-void Integration_in_BK_equation(std::complex<double>* Smatrix_in, std::complex<double>* Integrated_out);
+//void Integration_in_BK_equation(std::complex<double>* Smatrix_in, std::complex<double>* Integrated_out);
 
 
 void f_one_step_BK_complex(
@@ -619,13 +725,13 @@ void f_one_step_BK_complex(
 {
 	vector<complex<double>> temp_s_BMS_in(NX*NX, 0);
 
-#pragma omp parallel for num_threads(6)
+#pragma omp parallel for num_threads(2)
 	for (int veint = 0; veint < NX*NX; veint++) {
 		temp_s_BMS_in[veint] = sol_BMS_g_in[veint];
 	}
 
-	Integration_in_BK_equation(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
-	//Integration_in_BK_equation_cpp(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
+	//Integration_in_BK_equation(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
+	Integration_in_BK_equation_cpp(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
 
 }
 
@@ -635,13 +741,13 @@ void s_one_step_BK_complex(const vector<complex<double>> &K1_g_in,
 {
 	vector<complex<double>> temp_s_BMS_in(NX*NX, 0);
 
-#pragma omp parallel for num_threads(6)
+#pragma omp parallel for num_threads(2)
 	for (int veint = 0; veint < NX*NX; veint++) {
 		temp_s_BMS_in[veint] = sol_BMS_g_in[veint] + dtau / 2.0*K1_g_in[veint];
 	}
 
-	Integration_in_BK_equation(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
-	//Integration_in_BK_equation_cpp(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
+	//Integration_in_BK_equation(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
+	Integration_in_BK_equation_cpp(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
 
 }
 
@@ -670,7 +776,7 @@ void one_step_complex(vector<complex<double>> &sol_BK, double dtau){
 	}
 }
 
-void Integration_in_logscale_BK_equation(std::complex<double>* Smatrix_in, std::complex<double>* Integrated_out);
+//void Integration_in_logscale_BK_equation(std::complex<double>* Smatrix_in, std::complex<double>* Integrated_out);
 
 void f_one_step_logscale_BK_complex(
 	vector<complex<double>> &sol_BMS_g_in,
@@ -678,13 +784,13 @@ void f_one_step_logscale_BK_complex(
 {
 	vector<complex<double>> temp_s_BMS_in(NX*NPHI, 0);
 
-#pragma omp parallel for num_threads(6)
+#pragma omp parallel for num_threads(2)
 	for (int veint = 0; veint < NX*NPHI; veint++) {
 		temp_s_BMS_in[veint] = sol_BMS_g_in[veint];
 	}
 
-	Integration_in_logscale_BK_equation(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
-	//Integration_in_logscale_BK_equation_cpp(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
+	//Integration_in_logscale_BK_equation(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
+	Integration_in_logscale_BK_equation_cpp(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
 
 }
 
@@ -694,13 +800,13 @@ void s_one_step_logscale_BK_complex(const vector<complex<double>> &K1_g_in,
 {
 	vector<complex<double>> temp_s_BMS_in(NX*NPHI, 0);
 
-#pragma omp parallel for num_threads(6)
+#pragma omp parallel for num_threads(2)
 	for (int veint = 0; veint < NX*NPHI; veint++) {
 		temp_s_BMS_in[veint] = sol_BMS_g_in[veint] + dtau / 2.0*K1_g_in[veint];
 	}
 
-	Integration_in_logscale_BK_equation(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
-	//Integration_in_logscale_BK_equation_cpp(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
+	//Integration_in_logscale_BK_equation(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
+	Integration_in_logscale_BK_equation_cpp(temp_s_BMS_in.data(), NEW_BMS_g_in.data());
 
 }
 
@@ -827,7 +933,7 @@ void print_logscale_g(vector<complex<double>> &sol_BK) {
 	delete[](y);
 }
 
-void FT_expantion(vector<complex<double>> &sol_BK)
+void FT_expantion(vector<complex<double>> &sol_BK, vector<double> &sol_BK_realc0, vector<double> &sol_BK_realc1)
 {
 	int N = NX;
 	double h = 1.0*LATTICE_SIZE / NX;
@@ -869,7 +975,7 @@ void FT_expantion(vector<complex<double>> &sol_BK)
 
 
 	ostringstream ofilename;
-	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\BK_logscale_res_FTsin_size"
+	ofilename << "I:\\Users\\document\\data\\odderon_BK\\BK_res"
 		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_t_" << tau << "_hipre.txt";
 
 	ofstream ofs_res(ofilename.str().c_str());
@@ -877,6 +983,8 @@ void FT_expantion(vector<complex<double>> &sol_BK)
 	ofs_res << "# r \t Re( S )0 \t Im( S )0 \t Re( S )s1 \t Im( S )s1 \t Re( S )s2 \t Im( S )s2 \t Re( S )s3 \t Im( S )s3 \t "
 		<< "Re( S )c1 \t Im( S )c1 \t Re( S )c2 \t Im( S )c2 \t Re( S )c3\t Im( S )c3 \t initialC"<< initial_C << endl;
 	for (int i = 0; i < NX; i++) {
+		sol_BK_realc0[i] = sol_BK_comp0[i].real();
+		sol_BK_realc1[i] = sol_BK_comps1[i].real();
 
 		ofs_res << scientific << exp(x[i]) 
 			<< "\t" << sol_BK_comp0[i].real() << "\t" << sol_BK_comp0[i].imag()
@@ -895,7 +1003,7 @@ int main(){
 	time_t t0 = time(NULL);
 	ostringstream ofilename;
 #ifdef LOGSCALE
-	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\solutions\\BK_logscale_res_taudep_size"
+	ofilename << "I:\\Users\\document\\data\\odderon_BK\\BK_res"
 		<< LATTICE_SIZE << "_grid_" << NX << "_phi_" << NPHI << "_timestep_" << DELTA_T << "_hipre.txt";
 #else
 	ofilename << "G:\\hagiyoshi\\Data\\BK_odderon\\solutions\\BK_res_taudep_size"
@@ -903,10 +1011,14 @@ int main(){
 #endif
 	ofstream ofs_res(ofilename.str().c_str());
 
-	ofs_res << "# tau \t r \t Re( S ) \t Im( S ) \t initialC " << initial_C << endl;
+	ofs_res << "# tau \t r \t Re( S ) \t Im( S ) \t initialC " << initial_C << "\t rhoparam" << endl;
 
 #ifdef LOGSCALE
 	vector<complex<double>> sol_BK_comp(NX*NPHI, 0);
+	vector<double> sol_BK_realc0(NX, 0);
+	vector<double> sol_BK_realc1(NX, 0);
+
+
 	double h_phi = 2.0*Pi / NPHI;
 	double h_half = 1.0*LATTICE_SIZE / NX;
 #else
@@ -922,10 +1034,11 @@ int main(){
 #ifdef LOGSCALE
 	//init_BK_log(sol_BK_comp.data());
 	init_BK_log_Ncalculation(sol_BK_comp.data());
+	FT_expantion(sol_BK_comp, sol_BK_realc0, sol_BK_realc1);
 	print_logscale_g(sol_BK_comp);
 	ofs_res << scientific << tau << "\t" << exp(-NX / 2.0*h_half) << "\t"
-		<< sol_BK_comp[NPHI / 4 * NX + NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + NX / 4].imag() << "\n";
-	FT_expantion(sol_BK_comp);
+		<< sol_BK_comp[NPHI / 4 * NX + NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + NX / 4].imag()
+		<< "\t" << integration_r_z_PP(sol_BK_realc0, sol_BK_realc1) << "\n";
 #else
 	init_BK(sol_BK_comp.data());
 	print_g(sol_BK_comp);
@@ -946,11 +1059,13 @@ int main(){
 #endif
 		}
 #ifdef LOGSCALE
+		FT_expantion(sol_BK_comp, sol_BK_realc0, sol_BK_realc1);
+
 		print_logscale_g(sol_BK_comp);
 		ofs_res << scientific << tau << "\t" << exp(-NX / 2.0*h_half) << "\t"
-			<< sol_BK_comp[NPHI / 4 * NX +  NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX +  NX / 4].imag() << "\n";
+			<< sol_BK_comp[NPHI / 4 * NX +  NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX +  NX / 4].imag()
+			<< "\t" << integration_r_z_PP(sol_BK_realc0, sol_BK_realc1) << "\n";
 
-		FT_expantion(sol_BK_comp);
 		cout << "time \t" << tau << "\n";
 #else
 		print_g(sol_BK_comp);
@@ -961,11 +1076,12 @@ int main(){
 	}
 
 #ifdef LOGSCALE
+	FT_expantion(sol_BK_comp, sol_BK_realc0, sol_BK_realc1);
 	print_logscale_g(sol_BK_comp);
 	ofs_res << scientific << tau << "\t" << exp(- NX / 2.0*h_half) << "\t"
-		<< sol_BK_comp[NPHI / 4 * NX + NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + NX / 4].imag() << "\n";
+		<< sol_BK_comp[NPHI / 4 * NX + NX / 4].real() << "\t" << sol_BK_comp[NPHI / 4 * NX + NX / 4].imag()
+		<< "\t" << integration_r_z_PP(sol_BK_realc0, sol_BK_realc1) << "\n";
 
-	FT_expantion(sol_BK_comp);
 	cout << "time \t" << tau << "\n";
 #else
 	print_g(sol_BK_comp);
